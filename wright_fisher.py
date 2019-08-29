@@ -17,6 +17,7 @@ class PopState(object):
         self.tables = tskit.TableCollection(1.0)
         self.buffered_edges = [[[], []] for i in range(N)]
         self.generation_offsets = [(0, len(self.buffered_edges))]
+        self.current_generation = 0
 
         # Measure time going forwards.
         # Will reverse later
@@ -92,8 +93,8 @@ def wright_fisher_eb(ngens, psurvival, popstate):
                 dead.append(i)
         x = len(popstate.buffered_edges)
         for d, p in zip(dead, parent_list):
-            n0 = popstate.tables.nodes.add_row(time=gen)
-            n1 = popstate.tables.nodes.add_row(time=gen)
+            n0 = popstate.tables.nodes.add_row(time=popstate.current_generation+gen)
+            n1 = popstate.tables.nodes.add_row(time=popstate.current_generation+gen)
             popstate.buffered_edges[p[4]][p[2]].append((0, 1, p[0], n0))
             popstate.buffered_edges[p[5]][p[3]].append((0, 1, p[1], n1))
             popstate.parents[d] = Parent(popstate.next_parent, n0, n1)
@@ -103,5 +104,6 @@ def wright_fisher_eb(ngens, psurvival, popstate):
         if len(dead) > 0:
             popstate.generation_offsets.append(
                 (x, len(popstate.buffered_edges)))
+    popstate.current_generation = gen
 
     return popstate
