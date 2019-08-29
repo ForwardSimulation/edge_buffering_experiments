@@ -74,7 +74,6 @@ def wright_fisher_eb(ngens, psurvival, popstate):
             if p.index == -1:
                 raise RuntimeError("oops, dead!")
             if np.random.uniform() > psurvival:
-                p.index = -1
                 parents = np.random.choice(len(popstate.parents), 2)
                 # "Mendel"
                 p0node = popstate.parents[parents[0]].n0
@@ -93,8 +92,14 @@ def wright_fisher_eb(ngens, psurvival, popstate):
                 dead.append(i)
         x = len(popstate.buffered_edges)
         for d, p in zip(dead, parent_list):
-            n0 = popstate.tables.nodes.add_row(time=popstate.current_generation+gen)
-            n1 = popstate.tables.nodes.add_row(time=popstate.current_generation+gen)
+            # NOTE: apply "dead" flag here
+            # so that we aren't giving invalid
+            # indexes in the regulation step above
+            popstate.parents[d].index = -1
+            n0 = popstate.tables.nodes.add_row(
+                time=popstate.current_generation+gen)
+            n1 = popstate.tables.nodes.add_row(
+                time=popstate.current_generation+gen)
             popstate.buffered_edges[p[4]][p[2]].append((0, 1, p[0], n0))
             popstate.buffered_edges[p[5]][p[3]].append((0, 1, p[1], n1))
             popstate.parents[d] = Parent(popstate.next_parent, n0, n1)
