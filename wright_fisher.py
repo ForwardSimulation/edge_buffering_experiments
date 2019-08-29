@@ -11,7 +11,6 @@ class Parent(object):
 
 class PopState(object):
     def __init__(self, N):
-        self.edge_buffer = [[[], []] for i in range(N)]
         self.parents = [Parent(i, 2*i, 2*i+1) for i in range(N)]
         self.next_parent = N
         self.tables = tskit.TableCollection(1.0)
