@@ -108,6 +108,6 @@ def wright_fisher_eb(ngens, psurvival, popstate):
         if len(dead) > 0:
             popstate.generation_offsets.append(
                 (x, len(popstate.buffered_edges)))
-    popstate.current_generation = gen
+    popstate.current_generation += gen
 
     return popstate
