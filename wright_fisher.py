@@ -94,10 +94,6 @@ def wright_fisher_eb(ngens, psurvival, popstate):
         for d, p in zip(dead, parent_list):
             n0 = popstate.tables.nodes.add_row(time=gen)
             n1 = popstate.tables.nodes.add_row(time=gen)
-            # popstate.tables.edges.add_row(
-            #     left=0, right=1, parent=p[0], child=n0)
-            # popstate.tables.edges.add_row(
-            #     left=0, right=1, parent=p[1], child=n1)
             popstate.buffered_edges[p[4]][p[2]].append((0, 1, p[0], n0))
             popstate.buffered_edges[p[5]][p[3]].append((0, 1, p[1], n1))
             popstate.parents[d] = Parent(popstate.next_parent, n0, n1)
