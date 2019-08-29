@@ -26,7 +26,6 @@ for p in pstate.parents:
 pstate.tables.nodes.set_columns(
     flags=flags, time=-1.0*(pstate.tables.nodes.time - pstate.tables.nodes.time.max()))
 
-pstate.tables.sort()
 idmap = pstate.tables.simplify()
 samples = np.where(flags == 1)[0]
 ts = pstate.tables.tree_sequence()
