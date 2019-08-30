@@ -39,6 +39,11 @@ t.draw(path="tree_eb_multiple_step1.svg", format="svg", height=1000,
        width=1000, node_colours=node_colors, node_labels=node_labels)
 
 # Remap the parental nodes
+# NOTE: these data also need sorting according
+# to birth times!!!!
+# NOTE: we should also resize pstate.buffered_edges
+# to be the right length around here, as we'd do that
+# in practice to save RAM
 for p in pstate.parents:
     assert p.n0 != tskit.NULL, "NULL node badness"
     assert p.n1 != tskit.NULL, "NULL node badness"
