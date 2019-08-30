@@ -1,6 +1,7 @@
 import wright_fisher
 import numpy as np
 import tskit
+import sys
 
 np.random.seed(333)
 
@@ -18,8 +19,6 @@ for o in reversed(pstate.generation_offsets):
         for j in pstate.buffered_edges[i]:
             j.clear()
 
-# Reset offsets
-pstate.generation_offsets = [(0, len(pstate.buffered_edges))]
 
 flags = np.zeros(len(pstate.tables.nodes), dtype=np.uint32)
 for p in pstate.parents:
@@ -38,12 +37,10 @@ t = next(ts.trees())
 t.draw(path="tree_eb_multiple_step1.svg", format="svg", height=1000,
        width=1000, node_colours=node_colors, node_labels=node_labels)
 
+# NOTE: the cleanup steps below should be part of a more general
+# API
+
 # Remap the parental nodes
-# NOTE: these data also need sorting according
-# to birth times!!!!
-# NOTE: we should also resize pstate.buffered_edges
-# to be the right length around here, as we'd do that
-# in practice to save RAM
 for p in pstate.parents:
     assert p.n0 != tskit.NULL, "NULL node badness"
     assert p.n1 != tskit.NULL, "NULL node badness"
@@ -51,6 +48,22 @@ for p in pstate.parents:
     p.n1 = idmap[p.n1]
     assert p.n0 < len(pstate.tables.nodes)
     assert p.n1 < len(pstate.tables.nodes)
+
+
+# Sort the parent tracker on birth order and reindex
+pstate.parents = sorted(pstate.parents, key=lambda x: (
+    pstate.tables.nodes.time[x.n0], x.n0))
+for i, p in enumerate(pstate.parents):
+    p.index = i
+assert max([i.index for i in pstate.parents]) < len(pstate.parents)
+
+# Reset the buffer and the index
+pstate.buffered_edges = [[[], []] for i in range(len(pstate.parents))]
+pstate.next_parent = len(pstate.buffered_edges)
+# Reset offsets
+pstate.generation_offsets = [(0, len(pstate.buffered_edges))]
+print(len(pstate.parents), len(pstate.buffered_edges),
+      pstate.next_parent, pstate.generation_offsets)
 
 # Annoyance arising from recording time forwards:
 flags = np.zeros(len(pstate.tables.nodes), dtype=np.uint32)
@@ -123,7 +136,7 @@ temp_edges_from_before = tskit.EdgeTable()
 new_edges2 = 0
 edges_added = 0
 for o in reversed(pstate.generation_offsets):
-    print(*o)
+    print("range =", *o)
     for i in range(*o):
         # Get the parent node IDs
         # NOTE: this could be more efficient
@@ -138,11 +151,7 @@ for o in reversed(pstate.generation_offsets):
             if pnodes[n] is not None:
                 new_edges2 += len(pstate.buffered_edges[i][n])
                 if pnodes[n] < old_node_table_len:
-                    for k in reversed(pstate.buffered_edges[i][n]):
-                        edges_added += 1
-                        temp_edges_from_before.add_row(*k)
-                    ex = np.flip(
-                        np.where(pstate.tables.edges.parent == pnodes[n])[0])
+                    ex = np.where(pstate.tables.edges.parent == pnodes[n])[0]
                     if len(ex) > 0:
                         v = len(temp_edges_from_before)
                         temp_edges_from_before.append_columns(
@@ -152,6 +161,9 @@ for o in reversed(pstate.generation_offsets):
                             pstate.tables.edges.child[ex])
                         edges_added += (len(temp_edges_from_before)-v)
                         assert len(temp_edges_from_before) - v == len(ex)
+                    for k in pstate.buffered_edges[i][n]:
+                        edges_added += 1
+                        temp_edges_from_before.add_row(*k)
                 else:
                     for k in pstate.buffered_edges[i][n]:
                         edges_added += 1
@@ -164,9 +176,9 @@ print(len(pstate.tables.edges), len(temp_edges), new_edges2)
 pstate.tables.edges.set_columns(
     temp_edges.left, temp_edges.right, temp_edges.parent, temp_edges.child)
 pstate.tables.edges.append_columns(
-    temp_edges_from_before.left, temp_edges_from_before.right, np.flip(
-        temp_edges_from_before.parent),
-    np.flip(temp_edges_from_before.child))
+    temp_edges_from_before.left, temp_edges_from_before.right,
+    temp_edges_from_before.parent,
+    temp_edges_from_before.child)
 
 print(len(pstate.tables.edges), len(temp_edges), new_edges2)
 
