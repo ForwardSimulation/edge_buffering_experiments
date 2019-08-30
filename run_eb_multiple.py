@@ -47,7 +47,7 @@ for p in pstate.parents:
     assert p.n0 < len(pstate.tables.nodes)
     assert p.n1 < len(pstate.tables.nodes)
 
-# Annoyane arising from recording time forwards:
+# Annoyance arising from recording time forwards:
 flags = np.zeros(len(pstate.tables.nodes), dtype=np.uint32)
 pstate.tables.nodes.set_columns(
     flags=flags, time=-1.*(pstate.tables.nodes.time - pstate.tables.nodes.time.max()))
