@@ -57,7 +57,6 @@ for p in pstate.parents:
 pwhere = [None] * len(pstate.parents)
 with open("before.txt", 'w') as f:
     for i, p in enumerate(pstate.parents):
-        p.index = i
         l0 = np.where(pstate.tables.edges.parent == p.n0)[0]
         l1 = np.where(pstate.tables.edges.parent == p.n1)[0]
         f.write(f"{p.n0} -> {l0}, {p.n1} -> {l1}\n")
@@ -73,15 +72,17 @@ with open("before.txt", 'w') as f:
             loc1 = l1[0]
             is_edge1 = True
 
-        pwhere[p.index] = (ptime, loc0, loc1, is_edge0, is_edge1)
+        pwhere[i] = (p, (ptime, loc0, loc1, is_edge0, is_edge1))
 # Relies on Python's sort being a stable sort!
-pstate.parents = sorted(pstate.parents, key=lambda x: (
-    pwhere[x.index][0], min(pwhere[x.index][1], pwhere[x.index][2])))
+pwhere = sorted(pwhere,
+                key=lambda x: (x[1][0], min(x[1][1], x[1][2])))
+pstate.parents = [i[0] for i in pwhere]
+pwhere = [i[1] for i in pwhere]
 with open("after.txt", 'w') as f:
     for i, p in enumerate(pstate.parents):
-        f.write(
-            f"{p.n0} -> {pwhere[p.index]}, {p.n1}, {pstate.tables.nodes.time[p.n0]} {pstate.tables.nodes.time[p.n1]}\n")
         p.index = i
+        f.write(
+            f"{p.n0} {p.n1}-> {pwhere[p.index]}, {pstate.tables.nodes.time[p.n0]} {pstate.tables.nodes.time[p.n1]}\n")
 
 
 # Sort the parent tracker on birth order and reindex
