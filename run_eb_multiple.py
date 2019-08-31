@@ -37,6 +37,9 @@ t = next(ts.trees())
 t.draw(path="tree_eb_multiple_step1.svg", format="svg", height=1000,
        width=1000, node_colours=node_colors, node_labels=node_labels)
 
+with open('old_edges.txt', 'w') as f:
+    for e in pstate.tables.edges:
+        f.write(f'{e} {pstate.tables.nodes.time[e.parent]}\n')
 # NOTE: the cleanup steps below should be part of a more general
 # API
 
@@ -49,13 +52,44 @@ for p in pstate.parents:
     assert p.n0 < len(pstate.tables.nodes)
     assert p.n1 < len(pstate.tables.nodes)
 
+# We need to know when the parental nodes first appear in the edge table
+# NOTE: this step is not complete.  We don't have a way to use this at the end
+pwhere = [None] * len(pstate.parents)
+with open("before.txt", 'w') as f:
+    for i, p in enumerate(pstate.parents):
+        p.index = i
+        l0 = np.where(pstate.tables.edges.parent == p.n0)[0]
+        l1 = np.where(pstate.tables.edges.parent == p.n1)[0]
+        f.write(f"{p.n0} -> {l0}, {p.n1} -> {l1}\n")
+        ptime = pstate.tables.nodes.time[p.n0]
+        loc0 = len(pstate.tables.edges)
+        loc1 = len(pstate.tables.edges)
+        is_edge0 = False
+        is_edge1 = False
+        if len(l0) > 0:
+            loc0 = l0[0]
+            is_edge0 = True
+        if len(l1) > 0:
+            loc1 = l1[0]
+            is_edge1 = True
+
+        pwhere[p.index] = (ptime, loc0, loc1, is_edge0, is_edge1)
+# Relies on Python's sort being a stable sort!
+pstate.parents = sorted(pstate.parents, key=lambda x: (
+    pwhere[x.index][0], min(pwhere[x.index][1], pwhere[x.index][2])))
+with open("after.txt", 'w') as f:
+    for i, p in enumerate(pstate.parents):
+        f.write(
+            f"{p.n0} -> {pwhere[p.index]}, {p.n1}, {pstate.tables.nodes.time[p.n0]} {pstate.tables.nodes.time[p.n1]}\n")
+        p.index = i
+
 
 # Sort the parent tracker on birth order and reindex
-pstate.parents = sorted(pstate.parents, key=lambda x: (
-    pstate.tables.nodes.time[x.n0], x.n0))
-for i, p in enumerate(pstate.parents):
-    p.index = i
-assert max([i.index for i in pstate.parents]) < len(pstate.parents)
+# pstate.parents = sorted(pstate.parents, key=lambda x: (
+#     pstate.tables.nodes.time[x.n0], x.n0))
+# for i, p in enumerate(pstate.parents):
+#     p.index = i
+# assert max([i.index for i in pstate.parents]) < len(pstate.parents)
 
 # Reset the buffer and the index
 pstate.buffered_edges = [[[], []] for i in range(len(pstate.parents))]
