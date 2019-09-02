@@ -82,7 +82,28 @@ with open("after.txt", 'w') as f:
     for i, p in enumerate(pstate.parents):
         p.index = i
         f.write(
-            f"{p.n0} {p.n1}-> {pwhere[p.index]}, {pstate.tables.nodes.time[p.n0]} {pstate.tables.nodes.time[p.n1]}\n")
+            f"{p.n0} {p.n1}-> {pwhere[p.index]}, {pstate.tables.nodes.time[p.n0]}  {pstate.tables.nodes.time[p.n1]}\n")
+
+# Show we can rebuild
+E = 0
+e = tskit.tables.EdgeTable()
+for p, w in zip(pstate.parents, pwhere):
+    for i in [0, 1]:
+        while E < len(pstate.tables.edges) and E <= w[i+1] and w[i+1] < len(pstate.tables.edges):
+            e.add_row(pstate.tables.edges[E].left,
+                      pstate.tables.edges[E].right,
+                      pstate.tables.edges[E].parent,
+                      pstate.tables.edges[E].child)
+            E += 1
+
+while E < len(pstate.tables.edges):
+    e.add_row(pstate.tables.edges[E].left,
+              pstate.tables.edges[E].right,
+              pstate.tables.edges[E].parent,
+              pstate.tables.edges[E].child)
+    E += 1
+
+assert e == pstate.tables.edges
 
 
 # Sort the parent tracker on birth order and reindex
@@ -170,6 +191,7 @@ temp_edges_from_before = tskit.EdgeTable()
 
 new_edges2 = 0
 edges_added = 0
+E = 0
 for o in reversed(pstate.generation_offsets):
     print("range =", *o)
     for i in range(*o):
