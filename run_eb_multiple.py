@@ -220,6 +220,14 @@ for o in reversed(pstate.generation_offsets):
             # NOTE: the error here is that we do not process
             # previous edge table entries w.r.to all in pnodes
             # prior to adding in the buffered edges
+            # In the inner while loops, the correct procedure
+            # should be:
+            # 1. Add in all edges whose parents predate
+            #    any of the two parental nodes.
+            # 2. Add in all pre-existing edges from parent node 1
+            # 3. Add in all new edges from parent node 1
+            # 4. Add in all pre-exising edges from parent node 2
+            # 5. Add in all new edges from parent node 2
             if pnodes[n] < len(pstate.tables.edges):
                 if pwhere[i][1+n] < len(pstate.tables.edges):
                     print(
