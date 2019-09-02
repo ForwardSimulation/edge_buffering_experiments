@@ -229,11 +229,14 @@ for o in reversed(pstate.generation_offsets):
             # 4. Add in all pre-exising edges from parent node 2
             # 5. Add in all new edges from parent node 2
             if pnodes[n] < len(pstate.tables.edges):
+                ptime = pstate.tables.nodes.time[pnodes[0]]
+                assert ptime == pstate.tables.nodes.time[pnodes[1]]
                 if pwhere[i][1+n] < len(pstate.tables.edges):
                     print(
                         f"Taking care of {pnodes[n]} {old_node_table_len} {n} {pwhere[i]}")
                     while E < len(pstate.tables.edges) and E < pwhere[i][1+n]:
-                        print(f"0: adding {pstate.tables.edges[E]} {pstate.tables.nodes.time[pstate.tables.edges[E].parent]}")
+                        print(
+                            f"0: adding {pstate.tables.edges[E]} {pstate.tables.nodes.time[pstate.tables.edges[E].parent]}")
                         temp_edges_from_before.add_row(
                             pstate.tables.edges[E].left,
                             pstate.tables.edges[E].right,
@@ -241,7 +244,8 @@ for o in reversed(pstate.generation_offsets):
                             pstate.tables.edges[E].child)
                         E += 1
                     while E < len(pstate.tables.edges) and pstate.tables.edges.parent[E] == pnodes[n]:
-                        print(f"1: adding {pstate.tables.edges[E]} {pstate.tables.nodes.time[pstate.tables.edges[E].parent]}")
+                        print(
+                            f"1: adding {pstate.tables.edges[E]} {pstate.tables.nodes.time[pstate.tables.edges[E].parent]}")
                         temp_edges_from_before.add_row(
                             pstate.tables.edges[E].left,
                             pstate.tables.edges[E].right,
@@ -253,7 +257,8 @@ for o in reversed(pstate.generation_offsets):
                     assert k[2] == pnodes[n]
                     edges_added += 1
                     temp_edges_from_before.add_row(*k)
-                    print(f"3: adding {temp_edges_from_before[-1]} {pstate.tables.nodes.time[temp_edges_from_before.parent[-1]]}")
+                    print(
+                        f"3: adding {temp_edges_from_before[-1]} {pstate.tables.nodes.time[temp_edges_from_before.parent[-1]]}")
             else:
                 for k in pstate.buffered_edges[i][n]:
                     assert k[2] == pnodes[n]
