@@ -251,10 +251,10 @@ for o in reversed(pstate.generation_offsets):
                     assert k[2] == pnodes[n]
                     edges_added += 1
                     temp_edges.add_row(*k)
-                    print(f"3: adding {temp_edges[-1]}")
+                    print(f"4: adding {temp_edges[-1]}")
 
 while E < len(pstate.tables.edges):
-    print(f"4: adding {pstate.tables.edges[E]}")
+    print(f"5: adding {pstate.tables.edges[E]}")
     temp_edges_from_before.add_row(
         pstate.tables.edges[E].left,
         pstate.tables.edges[E].right,
