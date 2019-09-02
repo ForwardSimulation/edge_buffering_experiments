@@ -15,6 +15,7 @@ class PopState(object):
         self.next_parent = N
         self.tables = tskit.TableCollection(1.0)
         self.buffered_edges = [[[], []] for i in range(N)]
+        self.pnodes = [(2*i, 2*i+1) for i in range(N)]
         self.generation_offsets = [(0, len(self.buffered_edges))]
         self.current_generation = 0
 
@@ -101,6 +102,7 @@ def wright_fisher_eb(ngens, psurvival, popstate):
                 time=popstate.current_generation+gen)
             popstate.buffered_edges[p[4]][p[2]].append((0, 1, p[0], n0))
             popstate.buffered_edges[p[5]][p[3]].append((0, 1, p[1], n1))
+            popstate.pnodes.append((n0, n1))
             popstate.parents[d] = Parent(popstate.next_parent, n0, n1)
             popstate.next_parent += 1
             popstate.buffered_edges.append([[], []])
