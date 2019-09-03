@@ -54,6 +54,15 @@ for p in pstate.parents:
 
 # We need to know when the parental nodes first appear in the edge table
 pwhere = [None] * len(pstate.parents)
+# NOTE: the problem now is the following
+# With ancient samples, simplification does not
+# guarante that the parents in the edge table
+# are in the right order to simplify later.
+# Thus, there may be no simple method for
+# stitching together the edge table later.
+# One simplistic alternative is to sort right after
+# simplification and call it good.
+# This must also be the case with ancient samples?
 edge_proxy = np.rec.fromarrays((pstate.tables.nodes.time[pstate.tables.edges.parent],
                                 pstate.tables.edges.parent),
                                dtype=[('time', np.float64), ('parent', np.int32)])
