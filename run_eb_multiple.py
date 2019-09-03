@@ -53,7 +53,6 @@ for p in pstate.parents:
     assert p.n1 < len(pstate.tables.nodes)
 
 # We need to know when the parental nodes first appear in the edge table
-# NOTE: this step is not complete.  We don't have a way to use this at the end
 pwhere = [None] * len(pstate.parents)
 with open("before.txt", 'w') as f:
     for i, p in enumerate(pstate.parents):
