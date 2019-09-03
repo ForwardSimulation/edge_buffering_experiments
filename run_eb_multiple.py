@@ -210,60 +210,164 @@ temp_edges_from_before = tskit.EdgeTable()
 new_edges2 = 0
 edges_added = 0
 E = 0
+# NOTE: issue now is corner case of pre-existing edge
+# not in edge table, but then leaving descendants later
 for o in reversed(pstate.generation_offsets):
     print("range =", *o)
     for i in range(*o):
         # Fetch the parent node IDs
         pnodes = pstate.pnodes[i]
-        for n in [0, 1]:
-            # NOTE: the error here is that we do not process
-            # previous edge table entries w.r.to all in pnodes
-            # prior to adding in the buffered edges
-            # In the inner while loops, the correct procedure
-            # should be:
-            # 1. Add in all edges whose parents predate
-            #    any of the two parental nodes.
-            # 2. Add in all pre-existing edges from parent node 1
-            # 3. Add in all new edges from parent node 1
-            # 4. Add in all pre-exising edges from parent node 2
-            # 5. Add in all new edges from parent node 2
-            if pnodes[n] < len(pstate.tables.edges):
+        if i < len(pwhere):
+            if pwhere[i][1] < len(pstate.tables.edges) or pwhere[i][2] < len(pstate.tables.edges):
+                print(f"Handling {pnodes}")
                 ptime = pstate.tables.nodes.time[pnodes[0]]
                 assert ptime == pstate.tables.nodes.time[pnodes[1]]
-                if pwhere[i][1+n] < len(pstate.tables.edges):
+                w1 = pwhere[i][1]
+                w2 = pwhere[i][2]
+                mw = min(w1, w2)
+                while E < len(pstate.tables.edges) and E < mw:
                     print(
-                        f"Taking care of {pnodes[n]} {old_node_table_len} {n} {pwhere[i]}")
-                    while E < len(pstate.tables.edges) and E < pwhere[i][1+n]:
-                        print(
-                            f"0: adding {pstate.tables.edges[E]} {pstate.tables.nodes.time[pstate.tables.edges[E].parent]}")
-                        temp_edges_from_before.add_row(
-                            pstate.tables.edges[E].left,
-                            pstate.tables.edges[E].right,
-                            pstate.tables.edges[E].parent,
-                            pstate.tables.edges[E].child)
-                        E += 1
-                    while E < len(pstate.tables.edges) and pstate.tables.edges.parent[E] == pnodes[n]:
-                        print(
-                            f"1: adding {pstate.tables.edges[E]} {pstate.tables.nodes.time[pstate.tables.edges[E].parent]}")
-                        temp_edges_from_before.add_row(
-                            pstate.tables.edges[E].left,
-                            pstate.tables.edges[E].right,
-                            pstate.tables.edges[E].parent,
-                            pstate.tables.edges[E].child)
-                        E += 1
-                    print("done with pre-existing parent edges")
-                for k in pstate.buffered_edges[i][n]:
-                    assert k[2] == pnodes[n]
+                        f"0: adding {pstate.tables.edges[E]} {pstate.tables.nodes.time[pstate.tables.edges[E].parent]}")
+                    etime = pstate.tables.nodes.time[pstate.tables.edges.parent[E]]
+                    assert etime <= ptime, f"{etime} {ptime}"
+                    temp_edges_from_before.add_row(
+                        pstate.tables.edges[E].left,
+                        pstate.tables.edges[E].right,
+                        pstate.tables.edges[E].parent,
+                        pstate.tables.edges[E].child)
+                    E += 1
+                if E < len(pstate.tables.edges):
+                    print("check: ", E, mw, w1, w2,
+                          pstate.tables.edges[E], pnodes)
+                while E < len(pstate.tables.edges) and E <= w1 and w1 < len(pstate.tables.edges):
+                    print(
+                        f"0: adding {pstate.tables.edges[E]} {pstate.tables.nodes.time[pstate.tables.edges[E].parent]}")
+                    etime = pstate.tables.nodes.time[pstate.tables.edges.parent[E]]
+                    assert etime == ptime, f"{etime} {ptime}"
+                    temp_edges_from_before.add_row(
+                        pstate.tables.edges[E].left,
+                        pstate.tables.edges[E].right,
+                        pstate.tables.edges[E].parent,
+                        pstate.tables.edges[E].child)
+                    E += 1
+                if E < len(pstate.tables.edges):
+                    print("check2: ", E, mw, w1, w2,
+                          pstate.tables.edges[E], pnodes)
+
+                while E < len(pstate.tables.edges) and pstate.tables.edges.parent[E] == pnodes[0]:
+                    print(
+                        f"0: adding {pstate.tables.edges[E]} {pstate.tables.nodes.time[pstate.tables.edges[E].parent]}")
+                    etime = pstate.tables.nodes.time[pstate.tables.edges.parent[E]]
+                    assert etime == ptime, f"{etime} {ptime}"
+                    temp_edges_from_before.add_row(
+                        pstate.tables.edges[E].left,
+                        pstate.tables.edges[E].right,
+                        pstate.tables.edges[E].parent,
+                        pstate.tables.edges[E].child)
+                    E += 1
+                if E < len(pstate.tables.edges):
+                    print("check3: ", E, mw, w1, w2,
+                          pstate.tables.edges[E], pnodes)
+
+                for k in pstate.buffered_edges[i][0]:
+                    assert k[2] == pnodes[0]
                     edges_added += 1
                     temp_edges_from_before.add_row(*k)
                     print(
-                        f"3: adding {temp_edges_from_before[-1]} {pstate.tables.nodes.time[temp_edges_from_before.parent[-1]]}")
+                        f"1a: adding {temp_edges_from_before[-1]} {pstate.tables.nodes.time[temp_edges_from_before.parent[-1]]}")
+
+                while E < len(pstate.tables.edges) and E <= w2 and w2 < len(pstate.tables.edges):
+                    print(
+                        f"0: adding {pstate.tables.edges[E]} {pstate.tables.nodes.time[pstate.tables.edges[E].parent]}")
+                    etime = pstate.tables.nodes.time[pstate.tables.edges.parent[E]]
+                    assert etime == ptime, f"{etime} {ptime}"
+                    temp_edges_from_before.add_row(
+                        pstate.tables.edges[E].left,
+                        pstate.tables.edges[E].right,
+                        pstate.tables.edges[E].parent,
+                        pstate.tables.edges[E].child)
+                    E += 1
+                if E < len(pstate.tables.edges):
+                    print("check4: ", E, mw, w1, w2,
+                          pstate.tables.edges[E], pnodes)
+
+                while E < len(pstate.tables.edges) and pstate.tables.edges.parent[E] == pnodes[1]:
+                    print(
+                        f"0: adding {pstate.tables.edges[E]} {pstate.tables.nodes.time[pstate.tables.edges[E].parent]}")
+                    etime = pstate.tables.nodes.time[pstate.tables.edges.parent[E]]
+                    assert etime == ptime, f"{etime} {ptime}"
+                    temp_edges_from_before.add_row(
+                        pstate.tables.edges[E].left,
+                        pstate.tables.edges[E].right,
+                        pstate.tables.edges[E].parent,
+                        pstate.tables.edges[E].child)
+                    E += 1
+                if E < len(pstate.tables.edges):
+                    print("check5: ", E, mw, w1, w2,
+                          pstate.tables.edges[E], pnodes)
+
+                for k in pstate.buffered_edges[i][1]:
+                    assert k[2] == pnodes[1]
+                    edges_added += 1
+                    temp_edges_from_before.add_row(*k)
+                    print(
+                        f"1b: adding {temp_edges_from_before[-1]} {pstate.tables.nodes.time[temp_edges_from_before.parent[-1]]}")
+                print("//")
             else:
+                for n in [0, 1]:
+                    for k in pstate.buffered_edges[i][n]:
+                        assert k[2] == pnodes[n]
+                        edges_added += 1
+                        temp_edges_from_before.add_row(*k)
+                        print(
+                            f"3: adding {temp_edges_from_before[-1]} {pstate.tables.nodes.time[temp_edges_from_before.parent[-1]]}")
+                print("///")
+        else:
+            for n in [0, 1]:
                 for k in pstate.buffered_edges[i][n]:
                     assert k[2] == pnodes[n]
                     edges_added += 1
                     temp_edges.add_row(*k)
                     print(f"4: adding {temp_edges[-1]}")
+
+        # for n in [0, 1]:
+        #     # NOTE: the error here is that we do not process
+        #     # previous edge table entries w.r.to all in pnodes
+        #     # prior to adding in the buffered edges
+        #     # In the inner while loops, the correct procedure
+        #     # should be:
+        #     # 1. Add in all edges whose parents predate
+        #     #    any of the two parental nodes.
+        #     # 2. Add in all pre-existing edges from parent node 1
+        #     # 3. Add in all new edges from parent node 1
+        #     # 4. Add in all pre-exising edges from parent node 2
+        #     # 5. Add in all new edges from parent node 2
+        #     if pnodes[n] < len(pstate.tables.edges):
+        #         ptime = pstate.tables.nodes.time[pnodes[0]]
+        #         assert ptime == pstate.tables.nodes.time[pnodes[1]]
+        #         if pwhere[i][1+n] < len(pstate.tables.edges):
+        #             print(
+        #                 f"Taking care of {pnodes[n]} {old_node_table_len} {n} {pwhere[i]}")
+        #             while E < len(pstate.tables.edges) and E < pwhere[i][1+n]:
+        #                 print(
+        #                     f"0: adding {pstate.tables.edges[E]} {pstate.tables.nodes.time[pstate.tables.edges[E].parent]}")
+        #                 temp_edges_from_before.add_row(
+        #                     pstate.tables.edges[E].left,
+        #                     pstate.tables.edges[E].right,
+        #                     pstate.tables.edges[E].parent,
+        #                     pstate.tables.edges[E].child)
+        #                 E += 1
+        #             while E < len(pstate.tables.edges) and pstate.tables.edges.parent[E] == pnodes[n]:
+        #                 print(
+        #                     f"1: adding {pstate.tables.edges[E]} {pstate.tables.nodes.time[pstate.tables.edges[E].parent]}")
+        #                 temp_edges_from_before.add_row(
+        #                     pstate.tables.edges[E].left,
+        #                     pstate.tables.edges[E].right,
+        #                     pstate.tables.edges[E].parent,
+        #                     pstate.tables.edges[E].child)
+        #                 E += 1
+        #             print("done with pre-existing parent edges")
+            # else:
 
 while E < len(pstate.tables.edges):
     print(f"5: adding {pstate.tables.edges[E]}")
@@ -301,7 +405,8 @@ for i in range(2, len(temp_edges_from_before)):
     if ti > tip1:
         print(i, ti, tip1, ei, eip1)
         print("unsorted from b4")
-        sys.exit(0)
+
+sys.exit(0)
 
 pstate.tables.edges.set_columns(
     temp_edges.left, temp_edges.right, temp_edges.parent, temp_edges.child)
