@@ -67,13 +67,22 @@ edge_proxy = np.rec.fromarrays((pstate.tables.nodes.time[pstate.tables.edges.par
                                 pstate.tables.edges.parent),
                                dtype=[('time', np.float64), ('parent', np.int32)])
 isparent = [False for i in range(len(pstate.tables.nodes))]
+isalive = [False for i in range(len(isparent))]
+maxparent = [tskit.NULL for i in range(len(isparent))]
+minparent = [tskit.NULL for i in range(len(isparent))]
 ischild = [False for i in range(len(pstate.tables.nodes))]
 for p in pstate.parents:
     for n in [p.n0, p.n1]:
-        if n in pstate.tables.edges.parent:
-            isparent[n] = True
-        if n in pstate.tables.edges.child:
-            ischild[n] = True
+        isalive[n] = True
+
+for i, e in enumerate(pstate.tables.edges):
+    if isalive[e.parent]:
+        isparent[e.parent] = True
+        maxparent[e.parent] = i
+        if minparent[e.parent] == tskit.NULL:
+            minparent[e.parent] = i
+    if isalive[e.child]:
+        ischild[e.child] = True
 
 with open("before.txt", 'w') as f:
     for i, p in enumerate(pstate.parents):
@@ -255,59 +264,99 @@ for o in reversed(pstate.generation_offsets):
                   ischild[pnodes[0]], isparent[pnodes[1]], ischild[pnodes[1]])
 
             if isparent[pnodes[0]] and isparent[pnodes[1]]:
-                w = np.where(pstate.tables.edges.parent[E:] == pnodes[0])[0]
+                # w = np.where(pstate.tables.edges.parent[E:] == pnodes[0])[0]
+                # assert E+w[0] == minparent[pnodes[0]
+                #                            ], f"{E+w[0]} {minparent[pnodes[0]]}"
+                # assert E+w[-1] == maxparent[pnodes[0]
+                #                             ], f"{E+w[-1]} {maxparent[pnodes[0]]}"
                 temp_edges_from_before.append_columns(
-                        pstate.tables.edges.left[E:][:w[-1]+1],
-                        pstate.tables.edges.right[E:][:w[-1]+1],
-                        pstate.tables.edges.parent[E:][:w[-1]+1],
-                        pstate.tables.edges.child[E:][:w[-1]+1])
-                E = E + w[-1] + 1
+                    pstate.tables.edges.left[E:maxparent[pnodes[0]]+1],
+                    pstate.tables.edges.right[E:maxparent[pnodes[0]]+1],
+                    pstate.tables.edges.parent[E:maxparent[pnodes[0]]+1],
+                    pstate.tables.edges.child[E:maxparent[pnodes[0]]+1])
+                E = maxparent[pnodes[0]]+1
+                # temp_edges_from_before.append_columns(
+                #         pstate.tables.edges.left[E:][:w[-1]+1],
+                #         pstate.tables.edges.right[E:][:w[-1]+1],
+                #         pstate.tables.edges.parent[E:][:w[-1]+1],
+                #         pstate.tables.edges.child[E:][:w[-1]+1])
+                # E = E + w[-1] + 1
                 for k in pstate.buffered_edges[i][0]:
                     temp_edges_from_before.add_row(*k)
-                w = np.where(pstate.tables.edges.parent[E:] == pnodes[1])[0]
+                # w = np.where(pstate.tables.edges.parent[E:] == pnodes[1])[0]
+                # assert E+w[0] == minparent[pnodes[1]
+                #                            ], f"{E+w[0]} {minparent[pnodes[1]]}"
+                # assert E+w[-1] == maxparent[pnodes[1]
+                #                             ], f"{E+w[-1]} {maxparent[pnodes[1]]}"
                 temp_edges_from_before.append_columns(
-                        pstate.tables.edges.left[E:][:w[-1]+1],
-                        pstate.tables.edges.right[E:][:w[-1]+1],
-                        pstate.tables.edges.parent[E:][:w[-1]+1],
-                        pstate.tables.edges.child[E:][:w[-1]+1])
-                E = E + w[-1] + 1
+                    pstate.tables.edges.left[E:maxparent[pnodes[1]]+1],
+                    pstate.tables.edges.right[E:maxparent[pnodes[1]]+1],
+                    pstate.tables.edges.parent[E:maxparent[pnodes[1]]+1],
+                    pstate.tables.edges.child[E:maxparent[pnodes[1]]+1])
+                E = maxparent[pnodes[1]]+1
+                # temp_edges_from_before.append_columns(
+                #         pstate.tables.edges.left[E:][:w[-1]+1],
+                #         pstate.tables.edges.right[E:][:w[-1]+1],
+                #         pstate.tables.edges.parent[E:][:w[-1]+1],
+                #         pstate.tables.edges.child[E:][:w[-1]+1])
+                # E = E + w[-1] + 1
                 for k in pstate.buffered_edges[i][1]:
                     temp_edges_from_before.add_row(*k)
             elif isparent[pnodes[0]]:
-                w = np.where(pstate.tables.edges.parent[E:] == pnodes[0])[0]
+                # w = np.where(pstate.tables.edges.parent[E:] == pnodes[0])[0]
+                # assert E+w[0] == minparent[pnodes[0]
+                #                            ], f"{E+w[0]} {minparent[pnodes[0]]}"
+                # assert E+w[-1] == maxparent[pnodes[0]
+                #                             ], f"{E+w[-1]} {maxparent[pnodes[0]]}"
                 temp_edges_from_before.append_columns(
-                        pstate.tables.edges.left[E:][:w[-1]+1],
-                        pstate.tables.edges.right[E:][:w[-1]+1],
-                        pstate.tables.edges.parent[E:][:w[-1]+1],
-                        pstate.tables.edges.child[E:][:w[-1]+1])
-                E = E + w[-1] + 1
+                    pstate.tables.edges.left[E:maxparent[pnodes[0]]+1],
+                    pstate.tables.edges.right[E:maxparent[pnodes[0]]+1],
+                    pstate.tables.edges.parent[E:maxparent[pnodes[0]]+1],
+                    pstate.tables.edges.child[E:maxparent[pnodes[0]]+1])
+                E = maxparent[pnodes[0]]+1
+                # temp_edges_from_before.append_columns(
+                #         pstate.tables.edges.left[E:][:w[-1]+1],
+                #         pstate.tables.edges.right[E:][:w[-1]+1],
+                #         pstate.tables.edges.parent[E:][:w[-1]+1],
+                #         pstate.tables.edges.child[E:][:w[-1]+1])
+                # E = E + w[-1] + 1
                 for k in pstate.buffered_edges[i][0]:
                     temp_edges_from_before.add_row(*k)
                 for k in pstate.buffered_edges[i][1]:
                     temp_edges_from_before.add_row(*k)
             elif isparent[pnodes[1]]:
-                w = np.where(pstate.tables.edges.parent[E:] == pnodes[1])[0]
+                # w = np.where(pstate.tables.edges.parent[E:] == pnodes[1])[0]
+                # assert E+w[0] == minparent[pnodes[1]
+                #                            ], f"{E+w[0]} {minparent[pnodes[1]]}"
+                # assert E+w[-1] == maxparent[pnodes[1]
+                #                             ], f"{E+w[-1]} {maxparent[pnodes[1]]}"
                 temp_edges_from_before.append_columns(
-                        pstate.tables.edges.left[E:][:w[0]],
-                        pstate.tables.edges.right[E:][:w[0]],
-                        pstate.tables.edges.parent[E:][:w[0]],
-                        pstate.tables.edges.child[E:][:w[0]])
+                    pstate.tables.edges.left[E:minparent[pnodes[1]]],
+                    pstate.tables.edges.right[E:minparent[pnodes[1]]],
+                    pstate.tables.edges.parent[E:minparent[pnodes[1]]],
+                    pstate.tables.edges.child[E:minparent[pnodes[1]]])
+                # temp_edges_from_before.append_columns(
+                #        pstate.tables.edges.left[E:][:w[0]],
+                #        pstate.tables.edges.right[E:][:w[0]],
+                #        pstate.tables.edges.parent[E:][:w[0]],
+                #        pstate.tables.edges.child[E:][:w[0]])
                 for k in pstate.buffered_edges[i][0]:
                     temp_edges_from_before.add_row(*k)
                 temp_edges_from_before.append_columns(
-                        pstate.tables.edges.left[E:][w],
-                        pstate.tables.edges.right[E:][w],
-                        pstate.tables.edges.parent[E:][w],
-                        pstate.tables.edges.child[E:][w])
+                    pstate.tables.edges.left[minparent[pnodes[1]]:maxparent[pnodes[1]]+1],
+                    pstate.tables.edges.right[minparent[pnodes[1]]:maxparent[pnodes[1]]+1],
+                    pstate.tables.edges.parent[minparent[pnodes[1]]:maxparent[pnodes[1]]+1],
+                    pstate.tables.edges.child[minparent[pnodes[1]]:maxparent[pnodes[1]]+1])
                 for k in pstate.buffered_edges[i][1]:
                     temp_edges_from_before.add_row(*k)
-                E = E + w[-1] + 1
+                E = maxparent[pnodes[1]] + 1
             else:
                 ptime = pstate.tables.nodes.time[pnodes[0]]
                 if ischild[pnodes[0]] or ischild[pnodes[1]]:
                     while E < len(pstate.tables.edges) and pstate.tables.nodes.time[pstate.tables.edges.parent[E]] < ptime:
                         e = pstate.tables.edges[E]
-                        temp_edges_from_before.add_row(e.left, e.right, e.parent, e.child)
+                        temp_edges_from_before.add_row(
+                            e.left, e.right, e.parent, e.child)
                         E += 1
 
                 for n in [0, 1]:
