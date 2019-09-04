@@ -66,6 +66,15 @@ pwhere = [None] * len(pstate.parents)
 edge_proxy = np.rec.fromarrays((pstate.tables.nodes.time[pstate.tables.edges.parent],
                                 pstate.tables.edges.parent),
                                dtype=[('time', np.float64), ('parent', np.int32)])
+isparent = [False for i in range(len(pstate.tables.nodes))]
+ischild = [False for i in range(len(pstate.tables.nodes))]
+for p in pstate.parents:
+    for n in [p.n0, p.n1]:
+        if n in pstate.tables.edges.parent:
+            isparent[n] = True
+        if n in pstate.tables.edges.child:
+            ischild[n] = True
+
 with open("before.txt", 'w') as f:
     for i, p in enumerate(pstate.parents):
         l0 = np.where(pstate.tables.edges.parent == p.n0)[0]
@@ -242,42 +251,70 @@ for o in reversed(pstate.generation_offsets):
             pnodes = pstate.pnodes[i]
             where0 = pwhere[i][1]
             where1 = pwhere[i][2]
-            print(pnodes)
-            # Add in all pre-existing edges ancestral to pnodes[0]
-            while E < len(pstate.tables.edges) and E < where0:
-                e = pstate.tables.edges[E]
-                print(f"0: {pnodes} {e}")
-                temp_edges_from_before.add_row(e.left, e.right, e.parent, e.child)
-                E += 1
+            print("sanity:", pnodes, isparent[pnodes[0]],
+                  ischild[pnodes[0]], isparent[pnodes[1]], ischild[pnodes[1]])
 
-            # Add in all pre-exising edges descending from pnodes[0]
-            while E < len(pstate.tables.edges) and pstate.tables.edges.parent[E] == pnodes[0]:
-                e = pstate.tables.edges[E]
-                print(f"0a: {pnodes} {e}")
-                temp_edges_from_before.add_row(e.left, e.right, e.parent, e.child)
-                E += 1
+            if isparent[pnodes[0]] and isparent[pnodes[1]]:
+                w = np.where(pstate.tables.edges.parent[E:] == pnodes[0])[0]
+                temp_edges_from_before.append_columns(
+                        pstate.tables.edges.left[E:][:w[-1]+1],
+                        pstate.tables.edges.right[E:][:w[-1]+1],
+                        pstate.tables.edges.parent[E:][:w[-1]+1],
+                        pstate.tables.edges.child[E:][:w[-1]+1])
+                E = E + w[-1] + 1
+                for k in pstate.buffered_edges[i][0]:
+                    temp_edges_from_before.add_row(*k)
+                w = np.where(pstate.tables.edges.parent[E:] == pnodes[1])[0]
+                temp_edges_from_before.append_columns(
+                        pstate.tables.edges.left[E:][:w[-1]+1],
+                        pstate.tables.edges.right[E:][:w[-1]+1],
+                        pstate.tables.edges.parent[E:][:w[-1]+1],
+                        pstate.tables.edges.child[E:][:w[-1]+1])
+                E = E + w[-1] + 1
+                for k in pstate.buffered_edges[i][1]:
+                    temp_edges_from_before.add_row(*k)
+            elif isparent[pnodes[0]]:
+                w = np.where(pstate.tables.edges.parent[E:] == pnodes[0])[0]
+                temp_edges_from_before.append_columns(
+                        pstate.tables.edges.left[E:][:w[-1]+1],
+                        pstate.tables.edges.right[E:][:w[-1]+1],
+                        pstate.tables.edges.parent[E:][:w[-1]+1],
+                        pstate.tables.edges.child[E:][:w[-1]+1])
+                E = E + w[-1] + 1
+                for k in pstate.buffered_edges[i][0]:
+                    temp_edges_from_before.add_row(*k)
+                for k in pstate.buffered_edges[i][1]:
+                    temp_edges_from_before.add_row(*k)
+            elif isparent[pnodes[1]]:
+                w = np.where(pstate.tables.edges.parent[E:] == pnodes[1])[0]
+                temp_edges_from_before.append_columns(
+                        pstate.tables.edges.left[E:][:w[0]],
+                        pstate.tables.edges.right[E:][:w[0]],
+                        pstate.tables.edges.parent[E:][:w[0]],
+                        pstate.tables.edges.child[E:][:w[0]])
+                for k in pstate.buffered_edges[i][0]:
+                    temp_edges_from_before.add_row(*k)
+                temp_edges_from_before.append_columns(
+                        pstate.tables.edges.left[E:][w],
+                        pstate.tables.edges.right[E:][w],
+                        pstate.tables.edges.parent[E:][w],
+                        pstate.tables.edges.child[E:][w])
+                for k in pstate.buffered_edges[i][1]:
+                    temp_edges_from_before.add_row(*k)
+                E = E + w[-1] + 1
+            else:
+                ptime = pstate.tables.nodes.time[pnodes[0]]
+                if ischild[pnodes[0]] or ischild[pnodes[1]]:
+                    while E < len(pstate.tables.edges) and pstate.tables.nodes.time[pstate.tables.edges.parent[E]] < ptime:
+                        e = pstate.tables.edges[E]
+                        temp_edges_from_before.add_row(e.left, e.right, e.parent, e.child)
+                        E += 1
 
-            for k in pstate.buffered_edges[i][0]:
-                temp_edges_from_before.add_row(*k)
-                print(f"I want to add {k} from {pnodes[0]}")
-
-            # Add in all pre-existing edges ancestral to pnodes[1]
-            while E < len(pstate.tables.edges) and E < where1:
-                e = pstate.tables.edges[E]
-                print(f"0b: {pnodes} {e}")
-                temp_edges_from_before.add_row(e.left, e.right, e.parent, e.child)
-                E += 1
-
-            # Add in all pre-exising edges descending from pnodes[1]
-            while E < len(pstate.tables.edges) and pstate.tables.edges.parent[E] == pnodes[1]:
-                e = pstate.tables.edges[E]
-                print(f"0c: {pnodes} {e}")
-                temp_edges_from_before.add_row(e.left, e.right, e.parent, e.child)
-                E += 1
-
-            for k in pstate.buffered_edges[i][1]:
-                temp_edges_from_before.add_row(*k)
-                print(f"I want to add {k} from {pnodes[1]}")
+                for n in [0, 1]:
+                    for k in pstate.buffered_edges[i][n]:
+                        assert k[2] == pnodes[n]
+                        edges_added += 1
+                        temp_edges_from_before.add_row(*k)
         else:
             for n in [0, 1]:
                 for k in pstate.buffered_edges[i][n]:
@@ -338,7 +375,6 @@ for e in temp_edges_from_before:
     z = np.where(temp_edges_from_before.parent == e.parent)[0]
     print(f"edges: {e} -> {np.diff(z)}")
 
-sys.exit(0)
 
 print("result", edges_added, new_edges2, new_edges2 + len(pstate.tables.edges), tcopy_num_edges_b4_simplify,
       len(temp_edges) + len(temp_edges_from_before))
@@ -404,7 +440,12 @@ print(len(pstate.tables.edges), len(temp_edges), new_edges2)
 # for i in pstate.tables.edges:
 #     print(i, pstate.tables.nodes.time[i.parent])
 print(tcopy_num_edges_b4_simplify, len(pstate.tables.edges))
-pstate.tables.simplify()
+idmap = pstate.tables.simplify()
 ts2 = pstate.tables.tree_sequence()
+t = next(ts2.trees())
+node_colors = {idmap[i]: 'green' for i in samples}
+node_labels = {idmap[i]: ts.tables.nodes.time[idmap[i]] for i in samples}
+t.draw(path="tree_eb_multiple_step2b.svg", format="svg", height=1000,
+       width=1000, node_colours=node_colors, node_labels=node_labels)
 print(len(pstate.tables.edges), len(temp_edges), new_edges2)
 print(len(ts.tables.edges), len(ts2.tables.edges))
