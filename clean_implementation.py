@@ -114,8 +114,6 @@ def index_alive_parent_nodes(alive_parents, nnodes, edges):
 
 
 def sort_and_index_alive_parents(alive_parents, nodes, minparent):
-    # NOTE, this is wrong, all the various parent index things
-    # will be unsorted with respect to alive_parents
     times = nodes.time[:]
 
     def f(l1, l2):
