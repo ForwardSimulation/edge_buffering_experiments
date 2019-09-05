@@ -127,7 +127,7 @@ def sort_and_index_alive_parents(alive_parents, nodes, minparent):
             return l1
         return min(l1, l2)
     alive_parents[:] = sorted(alive_parents, key=lambda x: (
-        times[x.n0], x.n0, f(minparent[x.n0], minparent[x.n1])))
+        times[x.n0], f(minparent[x.n0],minparent[x.n1])))
     for i, p in enumerate(alive_parents):
         p.index = i
 
@@ -318,8 +318,17 @@ if __name__ == "__main__":
     sort_and_index_alive_parents(
         pstate.parents, pstate.tables.nodes, minparent)
     for p in pstate.parents:
-        print(
-            f"parents: {p.n0} {p.n1} {minparent[p.n0]} {maxparent[p.n0]} {minparent[p.n1]} {maxparent[p.n1]}")
+        w = minparent[p.n0]
+        w2 = minparent[p.n1]
+
+    with open("after_sorting_parents_cleaner.txt",'w') as f:
+        for p in pstate.parents:
+            ptime = pstate.tables.nodes.time[p.n0]
+            w = minparent[p.n0]
+            w2 = minparent[p.n1]
+            f.write(f"{p.n0} {p.n1}-> ({ptime} {w} {w2} {isparent[p.n0]} {isparent[p.n1]})\n")
+
+    # sys.exit(0)
 
     # 4. Reset the buffer and the index
     pstate.buffered_edges = [[[], []] for i in range(len(pstate.parents))]
