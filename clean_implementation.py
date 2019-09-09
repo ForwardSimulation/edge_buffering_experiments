@@ -356,7 +356,7 @@ if __name__ == "__main__":
     pstate.tables.nodes.set_columns(flags=flags, time=newtime)
 
     # Evolve again for a short bit of time
-    pstate = wright_fisher(20, 0.9, pstate)
+    pstate = wright_fisher(20, args.psurvival, pstate)
 
     # For testing, we merge the data "the old way"
     # and return a tree sequence
