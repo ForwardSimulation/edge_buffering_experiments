@@ -174,11 +174,13 @@ def reedgeucation(pstate, ischild, minparent, maxparent):
                     isparent1 = False
                 else:
                     isparent1 = True
-                mn0 = minparent[pnodes[0]]
+                # mn0 = minparent[pnodes[0]]
                 mx0 = maxparent[pnodes[0]]
                 mn1 = minparent[pnodes[1]]
                 mx1 = maxparent[pnodes[1]]
                 if isparent0 is True and isparent1 is True:
+                    assert mx0 != tskit.NULL
+                    assert mx1 != tskit.NULL
                     edges_previous_births.append_columns(
                         pstate.tables.edges.left[E:mx0+1],
                         pstate.tables.edges.right[E:mx0+1],
@@ -198,6 +200,8 @@ def reedgeucation(pstate, ischild, minparent, maxparent):
                         assert k[2] == pnodes[1]
                         edges_previous_births.add_row(*k)
                 elif isparent0 is True:
+                    assert mx0 != tskit.NULL
+                    assert isparent1 is False
                     edges_previous_births.append_columns(
                         pstate.tables.edges.left[E:mx0+1],
                         pstate.tables.edges.right[E:mx0+1],
@@ -209,6 +213,9 @@ def reedgeucation(pstate, ischild, minparent, maxparent):
                     for k in pstate.buffered_edges[i][1]:
                         edges_previous_births.add_row(*k)
                 elif isparent1 is True:
+                    assert mn1 != tskit.NULL
+                    assert mx1 != tskit.NULL
+                    assert isparent0 is False
                     edges_previous_births.append_columns(
                         pstate.tables.edges.left[E:mn1],
                         pstate.tables.edges.right[E:mn1],
@@ -373,5 +380,5 @@ if __name__ == "__main__":
     next(ts.trees()).draw(path="buffered.svg",
                           format="svg", height=1000, width=1000)
 
-    for e in ts.tables.edges:
-        print(e)
+    # for e in ts.tables.edges:
+    #     print(e)
