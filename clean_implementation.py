@@ -125,7 +125,7 @@ def sort_and_index_alive_parents(alive_parents, nodes, minparent):
             return l1
         return min(l1, l2)
     alive_parents[:] = sorted(alive_parents, key=lambda x: (
-        times[x.n0], f(minparent[x.n0],minparent[x.n1])))
+        times[x.n0], f(minparent[x.n0], minparent[x.n1])))
     for i, p in enumerate(alive_parents):
         p.index = i
 
@@ -174,51 +174,56 @@ def reedgeucation(pstate, ischild, minparent, maxparent):
                     isparent1 = False
                 else:
                     isparent1 = True
+                mn0 = minparent[pnodes[0]]
+                mx0 = maxparent[pnodes[0]]
+                mn1 = minparent[pnodes[1]]
+                mx1 = maxparent[pnodes[1]]
                 if isparent0 is True and isparent1 is True:
                     edges_previous_births.append_columns(
-                        pstate.tables.edges.left[E:maxparent[pnodes[0]]+1],
-                        pstate.tables.edges.right[E:maxparent[pnodes[0]]+1],
-                        pstate.tables.edges.parent[E:maxparent[pnodes[0]]+1],
-                        pstate.tables.edges.child[E:maxparent[pnodes[0]]+1])
-                    E = maxparent[pnodes[0]]+1
+                        pstate.tables.edges.left[E:mx0+1],
+                        pstate.tables.edges.right[E:mx0+1],
+                        pstate.tables.edges.parent[E:mx0+1],
+                        pstate.tables.edges.child[E:mx0+1])
+                    E = mx0+1
                     for k in pstate.buffered_edges[i][0]:
+                        assert k[2] == pnodes[0]
                         edges_previous_births.add_row(*k)
                     edges_previous_births.append_columns(
-                        pstate.tables.edges.left[E:maxparent[pnodes[1]]+1],
-                        pstate.tables.edges.right[E:maxparent[pnodes[1]]+1],
-                        pstate.tables.edges.parent[E:maxparent[pnodes[1]]+1],
-                        pstate.tables.edges.child[E:maxparent[pnodes[1]]+1])
-                    E = maxparent[pnodes[1]]+1
+                        pstate.tables.edges.left[E:mx1+1],
+                        pstate.tables.edges.right[E:mx1+1],
+                        pstate.tables.edges.parent[E:mx1+1],
+                        pstate.tables.edges.child[E:mx1+1])
+                    E = mx1+1
                     for k in pstate.buffered_edges[i][1]:
                         assert k[2] == pnodes[1]
                         edges_previous_births.add_row(*k)
                 elif isparent0 is True:
                     edges_previous_births.append_columns(
-                        pstate.tables.edges.left[E:maxparent[pnodes[0]]+1],
-                        pstate.tables.edges.right[E:maxparent[pnodes[0]]+1],
-                        pstate.tables.edges.parent[E:maxparent[pnodes[0]]+1],
-                        pstate.tables.edges.child[E:maxparent[pnodes[0]]+1])
-                    E = maxparent[pnodes[0]]+1
+                        pstate.tables.edges.left[E:mx0+1],
+                        pstate.tables.edges.right[E:mx0+1],
+                        pstate.tables.edges.parent[E:mx0+1],
+                        pstate.tables.edges.child[E:mx0+1])
+                    E = mx0 + 1
                     for k in pstate.buffered_edges[i][0]:
                         edges_previous_births.add_row(*k)
                     for k in pstate.buffered_edges[i][1]:
                         edges_previous_births.add_row(*k)
                 elif isparent1 is True:
                     edges_previous_births.append_columns(
-                        pstate.tables.edges.left[E:minparent[pnodes[1]]],
-                        pstate.tables.edges.right[E:minparent[pnodes[1]]],
-                        pstate.tables.edges.parent[E:minparent[pnodes[1]]],
-                        pstate.tables.edges.child[E:minparent[pnodes[1]]])
+                        pstate.tables.edges.left[E:mn1],
+                        pstate.tables.edges.right[E:mn1],
+                        pstate.tables.edges.parent[E:mn1],
+                        pstate.tables.edges.child[E:mn1])
                     for k in pstate.buffered_edges[i][0]:
                         edges_previous_births.add_row(*k)
                     edges_previous_births.append_columns(
-                        pstate.tables.edges.left[minparent[pnodes[1]]:maxparent[pnodes[1]]+1],
-                        pstate.tables.edges.right[minparent[pnodes[1]]:maxparent[pnodes[1]]+1],
-                        pstate.tables.edges.parent[minparent[pnodes[1]]:maxparent[pnodes[1]]+1],
-                        pstate.tables.edges.child[minparent[pnodes[1]]:maxparent[pnodes[1]]+1])
+                        pstate.tables.edges.left[mn1:mx1+1],
+                        pstate.tables.edges.right[mn1:mx1+1],
+                        pstate.tables.edges.parent[mn1:mx1+1],
+                        pstate.tables.edges.child[mn1:mx1+1])
                     for k in pstate.buffered_edges[i][1]:
                         edges_previous_births.add_row(*k)
-                    E = maxparent[pnodes[1]] + 1
+                    E = mx1 + 1
                 else:
                     ptime = pstate.tables.nodes.time[pnodes[0]]
                     if ischild[pnodes[0]] or ischild[pnodes[1]]:
@@ -319,12 +324,13 @@ if __name__ == "__main__":
         w = minparent[p.n0]
         w2 = minparent[p.n1]
 
-    with open("after_sorting_parents_cleaner.txt",'w') as f:
+    with open("after_sorting_parents_cleaner.txt", 'w') as f:
         for p in pstate.parents:
             ptime = pstate.tables.nodes.time[p.n0]
             w = minparent[p.n0]
             w2 = minparent[p.n1]
-            f.write(f"{p.n0} {p.n1}-> ({ptime} {w} {w2} {isparent[p.n0]} {isparent[p.n1]})\n")
+            f.write(
+                f"{p.n0} {p.n1}-> ({ptime} {w} {w2} {isparent[p.n0]} {isparent[p.n1]})\n")
 
     # sys.exit(0)
 
@@ -349,19 +355,23 @@ if __name__ == "__main__":
     # and return a tree sequence
     ts_classic_method = brute_force_merge_and_simplify(pstate)
 
-    reedgeucation(pstate, ischild, minparent, maxparent)
     flags = np.zeros(len(pstate.tables.nodes), dtype=np.uint32)
     for p in pstate.parents:
         flags[p.n0] = 1
         flags[p.n1] = 1
-
     pstate.tables.nodes.set_columns(
         flags=flags, time=-1.0*(pstate.tables.nodes.time - pstate.tables.nodes.time.max()))
 
-    for i, e in enumerate(pstate.tables.edges):
-        if i > 0:
-            em1 = pstate.tables.edges[i-1]
-            if pstate.tables.nodes.time[e.parent]>pstate.tables.nodes.time[em1.parent]:
-                print(f"{i} {e} {em1}")
+    reedgeucation(pstate, ischild, minparent, maxparent)
 
     idmap = pstate.tables.simplify()
+    ts = pstate.tables.tree_sequence()
+
+    # print trees to file
+    next(ts_classic_method.trees()).draw(
+        path="brute_force.svg", format="svg", height=1000, width=1000)
+    next(ts.trees()).draw(path="buffered.svg",
+                          format="svg", height=1000, width=1000)
+
+    for e in ts.tables.edges:
+        print(e)
