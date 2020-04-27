@@ -1,7 +1,8 @@
-import tskit
-import sys
 import argparse
+import sys
+
 import numpy as np
+import tskit
 
 
 class Parent(object):
@@ -13,11 +14,11 @@ class Parent(object):
 
 class PopState(object):
     def __init__(self, N):
-        self.parents = [Parent(i, 2*i, 2*i+1) for i in range(N)]
+        self.parents = [Parent(i, 2 * i, 2 * i + 1) for i in range(N)]
         self.next_parent = N
         self.tables = tskit.TableCollection(1.0)
         self.buffered_edges = [[[], []] for i in range(N)]
-        self.pnodes = [(2*i, 2*i+1) for i in range(N)]
+        self.pnodes = [(2 * i, 2 * i + 1) for i in range(N)]
         self.generation_offsets = [(0, len(self.buffered_edges))]
         self.current_generation = 0
 
@@ -29,10 +30,10 @@ class PopState(object):
 
 
 def wright_fisher(ngens, psurvival, popstate):
-    if psurvival >= 1. or psurvival < 0:
+    if psurvival >= 1.0 or psurvival < 0:
         raise ValueError("unhelpful survival probability")
 
-    for gen in range(1, ngens+1):
+    for gen in range(1, ngens + 1):
         # regulation
         dead = []
         parent_list = []
@@ -52,9 +53,16 @@ def wright_fisher(ngens, psurvival, popstate):
                 if np.random.uniform() < 0.5:
                     p1node = popstate.parents[parents[1]].n1
                     i1 = 1
-                parent_list.append((p0node, p1node, i0, i1,
-                                    popstate.parents[parents[0]].index,
-                                    popstate.parents[parents[1]].index))
+                parent_list.append(
+                    (
+                        p0node,
+                        p1node,
+                        i0,
+                        i1,
+                        popstate.parents[parents[0]].index,
+                        popstate.parents[parents[1]].index,
+                    )
+                )
                 dead.append(i)
         x = len(popstate.buffered_edges)
         for d, p in zip(dead, parent_list):
@@ -62,10 +70,8 @@ def wright_fisher(ngens, psurvival, popstate):
             # so that we aren't giving invalid
             # indexes in the regulation step above
             popstate.parents[d].index = -1
-            n0 = popstate.tables.nodes.add_row(
-                time=popstate.current_generation+gen)
-            n1 = popstate.tables.nodes.add_row(
-                time=popstate.current_generation+gen)
+            n0 = popstate.tables.nodes.add_row(time=popstate.current_generation + gen)
+            n1 = popstate.tables.nodes.add_row(time=popstate.current_generation + gen)
             popstate.buffered_edges[p[4]][p[2]].append((0, 1, p[0], n0))
             popstate.buffered_edges[p[5]][p[3]].append((0, 1, p[1], n1))
             popstate.pnodes.append((n0, n1))
@@ -74,8 +80,7 @@ def wright_fisher(ngens, psurvival, popstate):
             popstate.buffered_edges.append([[], []])
 
         if len(dead) > 0:
-            popstate.generation_offsets.append(
-                (x, len(popstate.buffered_edges)))
+            popstate.generation_offsets.append((x, len(popstate.buffered_edges)))
     popstate.current_generation += gen
 
     return popstate
@@ -124,8 +129,10 @@ def sort_and_index_alive_parents(alive_parents, nodes, minparent):
         elif l2 == tskit.NULL:
             return l1
         return min(l1, l2)
-    alive_parents[:] = sorted(alive_parents, key=lambda x: (
-        times[x.n0], f(minparent[x.n0], minparent[x.n1])))
+
+    alive_parents[:] = sorted(
+        alive_parents, key=lambda x: (times[x.n0], f(minparent[x.n0], minparent[x.n1]))
+    )
     for i, p in enumerate(alive_parents):
         p.index = i
 
@@ -137,14 +144,17 @@ def brute_force_merge_and_simplify(pstate):
     for p in pstate.parents:
         flags[p.n0] = 1
         flags[p.n1] = 1
-    tc.nodes.set_columns(flags=flags,
-                         time=-1.0*(pstate.tables.nodes.time -
-                                    pstate.tables.nodes.time.max()))
+    tc.nodes.set_columns(
+        flags=flags,
+        time=-1.0 * (pstate.tables.nodes.time - pstate.tables.nodes.time.max()),
+    )
 
-    tc.edges.set_columns(pstate.tables.edges.left,
-                         pstate.tables.edges.right,
-                         pstate.tables.edges.parent,
-                         pstate.tables.edges.child)
+    tc.edges.set_columns(
+        pstate.tables.edges.left,
+        pstate.tables.edges.right,
+        pstate.tables.edges.parent,
+        pstate.tables.edges.child,
+    )
     for eb in pstate.buffered_edges:
         for i in eb[0] + eb[1]:
             tc.edges.add_row(*i)
@@ -182,20 +192,22 @@ def reedgeucation(pstate, ischild, minparent, maxparent):
                     assert mx0 != tskit.NULL
                     assert mx1 != tskit.NULL
                     edges_previous_births.append_columns(
-                        pstate.tables.edges.left[E:mx0+1],
-                        pstate.tables.edges.right[E:mx0+1],
-                        pstate.tables.edges.parent[E:mx0+1],
-                        pstate.tables.edges.child[E:mx0+1])
-                    E = mx0+1
+                        pstate.tables.edges.left[E : mx0 + 1],
+                        pstate.tables.edges.right[E : mx0 + 1],
+                        pstate.tables.edges.parent[E : mx0 + 1],
+                        pstate.tables.edges.child[E : mx0 + 1],
+                    )
+                    E = mx0 + 1
                     for k in pstate.buffered_edges[i][0]:
                         assert k[2] == pnodes[0]
                         edges_previous_births.add_row(*k)
                     edges_previous_births.append_columns(
-                        pstate.tables.edges.left[E:mx1+1],
-                        pstate.tables.edges.right[E:mx1+1],
-                        pstate.tables.edges.parent[E:mx1+1],
-                        pstate.tables.edges.child[E:mx1+1])
-                    E = mx1+1
+                        pstate.tables.edges.left[E : mx1 + 1],
+                        pstate.tables.edges.right[E : mx1 + 1],
+                        pstate.tables.edges.parent[E : mx1 + 1],
+                        pstate.tables.edges.child[E : mx1 + 1],
+                    )
+                    E = mx1 + 1
                     for k in pstate.buffered_edges[i][1]:
                         assert k[2] == pnodes[1]
                         edges_previous_births.add_row(*k)
@@ -203,10 +215,11 @@ def reedgeucation(pstate, ischild, minparent, maxparent):
                     assert mx0 != tskit.NULL
                     assert isparent1 is False
                     edges_previous_births.append_columns(
-                        pstate.tables.edges.left[E:mx0+1],
-                        pstate.tables.edges.right[E:mx0+1],
-                        pstate.tables.edges.parent[E:mx0+1],
-                        pstate.tables.edges.child[E:mx0+1])
+                        pstate.tables.edges.left[E : mx0 + 1],
+                        pstate.tables.edges.right[E : mx0 + 1],
+                        pstate.tables.edges.parent[E : mx0 + 1],
+                        pstate.tables.edges.child[E : mx0 + 1],
+                    )
                     E = mx0 + 1
                     for k in pstate.buffered_edges[i][0]:
                         edges_previous_births.add_row(*k)
@@ -220,24 +233,31 @@ def reedgeucation(pstate, ischild, minparent, maxparent):
                         pstate.tables.edges.left[E:mn1],
                         pstate.tables.edges.right[E:mn1],
                         pstate.tables.edges.parent[E:mn1],
-                        pstate.tables.edges.child[E:mn1])
+                        pstate.tables.edges.child[E:mn1],
+                    )
                     for k in pstate.buffered_edges[i][0]:
                         edges_previous_births.add_row(*k)
                     edges_previous_births.append_columns(
-                        pstate.tables.edges.left[mn1:mx1+1],
-                        pstate.tables.edges.right[mn1:mx1+1],
-                        pstate.tables.edges.parent[mn1:mx1+1],
-                        pstate.tables.edges.child[mn1:mx1+1])
+                        pstate.tables.edges.left[mn1 : mx1 + 1],
+                        pstate.tables.edges.right[mn1 : mx1 + 1],
+                        pstate.tables.edges.parent[mn1 : mx1 + 1],
+                        pstate.tables.edges.child[mn1 : mx1 + 1],
+                    )
                     for k in pstate.buffered_edges[i][1]:
                         edges_previous_births.add_row(*k)
                     E = mx1 + 1
                 else:
                     ptime = pstate.tables.nodes.time[pnodes[0]]
                     if ischild[pnodes[0]] or ischild[pnodes[1]]:
-                        while E < len(pstate.tables.edges) and pstate.tables.nodes.time[pstate.tables.edges.parent[E]] < ptime:
+                        while (
+                            E < len(pstate.tables.edges)
+                            and pstate.tables.nodes.time[pstate.tables.edges.parent[E]]
+                            < ptime
+                        ):
                             e = pstate.tables.edges[E]
                             edges_previous_births.add_row(
-                                e.left, e.right, e.parent, e.child)
+                                e.left, e.right, e.parent, e.child
+                            )
                             E += 1
 
                     for n in [0, 1]:
@@ -255,30 +275,43 @@ def reedgeucation(pstate, ischild, minparent, maxparent):
             pstate.tables.edges[E].left,
             pstate.tables.edges[E].right,
             pstate.tables.edges[E].parent,
-            pstate.tables.edges[E].child)
+            pstate.tables.edges[E].child,
+        )
         E += 1
     pstate.tables.edges.set_columns(
-        edges_new_births.left, edges_new_births.right,
-        edges_new_births.parent, edges_new_births.child)
+        edges_new_births.left,
+        edges_new_births.right,
+        edges_new_births.parent,
+        edges_new_births.child,
+    )
     pstate.tables.edges.append_columns(
-        edges_previous_births.left, edges_previous_births.right,
+        edges_previous_births.left,
+        edges_previous_births.right,
         edges_previous_births.parent,
-        edges_previous_births.child)
+        edges_previous_births.child,
+    )
 
 
 def make_parser():
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
 
     optional = parser.add_argument_group("Simulation parameters")
-    optional.add_argument("--popsize", "-N", default=100,
-                          type=int, help="Diploid population size")
-    optional.add_argument("--seed", type=int,
-                          default=42, help="RNG seed")
-    optional.add_argument("--psurvival", '-p', type=float,
-                          default=0.9, help="Survival probability per generation")
-    optional.add_argument("--burnin", '-b', type=int,
-                          default=20, help="Burnin time. Multiple of N")
+    optional.add_argument(
+        "--popsize", "-N", default=100, type=int, help="Diploid population size"
+    )
+    optional.add_argument("--seed", type=int, default=42, help="RNG seed")
+    optional.add_argument(
+        "--psurvival",
+        "-p",
+        type=float,
+        default=0.9,
+        help="Survival probability per generation",
+    )
+    optional.add_argument(
+        "--burnin", "-b", type=int, default=20, help="Burnin time. Multiple of N"
+    )
     return parser
 
 
@@ -289,7 +322,7 @@ if __name__ == "__main__":
 
     pstate = PopState(args.popsize)
 
-    pstate = wright_fisher(args.burnin*args.popsize, args.psurvival, pstate)
+    pstate = wright_fisher(args.burnin * args.popsize, args.psurvival, pstate)
 
     # After one bout of simulation, things are easy,
     # an we can simply populate the edge table
@@ -310,8 +343,10 @@ if __name__ == "__main__":
         for i in [p.n0, p.n1]:
             flags[i] = tskit.NODE_IS_SAMPLE
     # 2. Set the flags + reverse time
-    pstate.tables.nodes.set_columns(flags=flags,
-                                    time=-1.0*(pstate.tables.nodes.time - pstate.tables.nodes.time.max()))
+    pstate.tables.nodes.set_columns(
+        flags=flags,
+        time=-1.0 * (pstate.tables.nodes.time - pstate.tables.nodes.time.max()),
+    )
     # 3. Simplify
     idmap = pstate.tables.simplify()
 
@@ -323,21 +358,22 @@ if __name__ == "__main__":
     #    simplified edge table
     #    Complexity: O(no. edges)
     isparent, ischild, minparent, maxparent = index_alive_parent_nodes(
-        pstate.parents, len(pstate.tables.nodes), pstate.tables.edges)
+        pstate.parents, len(pstate.tables.nodes), pstate.tables.edges
+    )
     # 3. We need to sort the alive parents, and re-index them
-    sort_and_index_alive_parents(
-        pstate.parents, pstate.tables.nodes, minparent)
+    sort_and_index_alive_parents(pstate.parents, pstate.tables.nodes, minparent)
     for p in pstate.parents:
         w = minparent[p.n0]
         w2 = minparent[p.n1]
 
-    with open("after_sorting_parents_cleaner.txt", 'w') as f:
+    with open("after_sorting_parents_cleaner.txt", "w") as f:
         for p in pstate.parents:
             ptime = pstate.tables.nodes.time[p.n0]
             w = minparent[p.n0]
             w2 = minparent[p.n1]
             f.write(
-                f"{p.n0} {p.n1}-> ({ptime} {w} {w2} {isparent[p.n0]} {isparent[p.n1]})\n")
+                f"{p.n0} {p.n1}-> ({ptime} {w} {w2} {isparent[p.n0]} {isparent[p.n1]})\n"
+            )
 
     # sys.exit(0)
 
@@ -351,8 +387,9 @@ if __name__ == "__main__":
     pstate.pnodes = [(i.n0, i.n1) for i in pstate.parents]
     # 8. Reset flags and change time from backwards to forwards
     flags = np.zeros(len(pstate.tables.nodes), dtype=np.uint32)
-    newtime = np.array([pstate.current_generation -
-                        i for i in pstate.tables.nodes.time])
+    newtime = np.array(
+        [pstate.current_generation - i for i in pstate.tables.nodes.time]
+    )
     pstate.tables.nodes.set_columns(flags=flags, time=newtime)
 
     # Evolve again for a short bit of time
@@ -367,7 +404,9 @@ if __name__ == "__main__":
         flags[p.n0] = 1
         flags[p.n1] = 1
     pstate.tables.nodes.set_columns(
-        flags=flags, time=-1.0*(pstate.tables.nodes.time - pstate.tables.nodes.time.max()))
+        flags=flags,
+        time=-1.0 * (pstate.tables.nodes.time - pstate.tables.nodes.time.max()),
+    )
 
     reedgeucation(pstate, ischild, minparent, maxparent)
 
@@ -376,9 +415,9 @@ if __name__ == "__main__":
 
     # print trees to file
     next(ts_classic_method.trees()).draw(
-        path="brute_force.svg", format="svg", height=1000, width=1000)
-    next(ts.trees()).draw(path="buffered.svg",
-                          format="svg", height=1000, width=1000)
+        path="brute_force.svg", format="svg", height=1000, width=1000
+    )
+    next(ts.trees()).draw(path="buffered.svg", format="svg", height=1000, width=1000)
 
     # for e in ts.tables.edges:
     #     print(e)

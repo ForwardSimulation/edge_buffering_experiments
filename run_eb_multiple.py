@@ -1,7 +1,9 @@
-import wright_fisher
+import sys
+
 import numpy as np
 import tskit
-import sys
+
+import wright_fisher
 
 np.random.seed(333)
 
@@ -26,20 +28,27 @@ for p in pstate.parents:
     flags[p.n1] = 1
 
 pstate.tables.nodes.set_columns(
-    flags=flags, time=-1.0*(pstate.tables.nodes.time - pstate.tables.nodes.time.max()))
+    flags=flags, time=-1.0 * (pstate.tables.nodes.time - pstate.tables.nodes.time.max())
+)
 
 idmap = pstate.tables.simplify()
 samples = np.where(flags == 1)[0]
 ts = pstate.tables.tree_sequence()
-node_colors = {idmap[i]: 'green' for i in samples}
+node_colors = {idmap[i]: "green" for i in samples}
 node_labels = {idmap[i]: ts.tables.nodes.time[idmap[i]] for i in samples}
 t = next(ts.trees())
-t.draw(path="tree_eb_multiple_step1.svg", format="svg", height=1000,
-       width=1000, node_colours=node_colors, node_labels=node_labels)
+t.draw(
+    path="tree_eb_multiple_step1.svg",
+    format="svg",
+    height=1000,
+    width=1000,
+    node_colours=node_colors,
+    node_labels=node_labels,
+)
 
-with open('old_edges.txt', 'w') as f:
+with open("old_edges.txt", "w") as f:
     for e in pstate.tables.edges:
-        f.write(f'{e} {pstate.tables.nodes.time[e.parent]}\n')
+        f.write(f"{e} {pstate.tables.nodes.time[e.parent]}\n")
 # NOTE: the cleanup steps below should be part of a more general
 # API
 
@@ -54,9 +63,10 @@ for p in pstate.parents:
 
 # We need to know when the parental nodes first appear in the edge table
 pwhere = [None] * len(pstate.parents)
-edge_proxy = np.rec.fromarrays((pstate.tables.nodes.time[pstate.tables.edges.parent],
-                                pstate.tables.edges.parent),
-                               dtype=[('time', np.float64), ('parent', np.int32)])
+edge_proxy = np.rec.fromarrays(
+    (pstate.tables.nodes.time[pstate.tables.edges.parent], pstate.tables.edges.parent),
+    dtype=[("time", np.float64), ("parent", np.int32)],
+)
 isparent = [False for i in range(len(pstate.tables.nodes))]
 isalive = [False for i in range(len(isparent))]
 maxparent = [tskit.NULL for i in range(len(isparent))]
@@ -75,7 +85,7 @@ for i, e in enumerate(pstate.tables.edges):
     if isalive[e.child]:
         ischild[e.child] = True
 
-with open("before.txt", 'w') as f:
+with open("before.txt", "w") as f:
     for i, p in enumerate(pstate.parents):
         l0 = np.where(pstate.tables.edges.parent == p.n0)[0]
         l1 = np.where(pstate.tables.edges.parent == p.n1)[0]
@@ -92,10 +102,8 @@ with open("before.txt", 'w') as f:
             loc1 = l1[0]
             is_edge1 = True
 
-        loc0a = edge_proxy.searchsorted(
-            np.array((ptime, p.n0), dtype=edge_proxy.dtype))
-        loc1a = edge_proxy.searchsorted(
-            np.array((ptime, p.n1), dtype=edge_proxy.dtype))
+        loc0a = edge_proxy.searchsorted(np.array((ptime, p.n0), dtype=edge_proxy.dtype))
+        loc1a = edge_proxy.searchsorted(np.array((ptime, p.n1), dtype=edge_proxy.dtype))
         # loc0 = loc0a
         # loc1 = loc1a
 
@@ -103,33 +111,41 @@ with open("before.txt", 'w') as f:
 
         pwhere[i] = (p, (ptime, loc0, loc1, is_edge0, is_edge1))
 # Relies on Python's sort being a stable sort!
-pwhere = sorted(pwhere,
-                key=lambda x: (x[1][0], min(x[1][1], x[1][2])))
+pwhere = sorted(pwhere, key=lambda x: (x[1][0], min(x[1][1], x[1][2])))
 pstate.parents = [i[0] for i in pwhere]
 pwhere = [i[1] for i in pwhere]
-with open("after.txt", 'w') as f:
+with open("after.txt", "w") as f:
     for i, p in enumerate(pstate.parents):
         p.index = i
         f.write(
-            f"{p.n0} {p.n1}-> {pwhere[p.index]}, {pstate.tables.nodes.time[p.n0]}  {pstate.tables.nodes.time[p.n1]}\n")
+            f"{p.n0} {p.n1}-> {pwhere[p.index]}, {pstate.tables.nodes.time[p.n0]}  {pstate.tables.nodes.time[p.n1]}\n"
+        )
 
 # Show we can rebuild
 E = 0
 e = tskit.tables.EdgeTable()
 for p, w in zip(pstate.parents, pwhere):
     for i in [0, 1]:
-        while E < len(pstate.tables.edges) and E <= w[i+1] and w[i+1] < len(pstate.tables.edges):
-            e.add_row(pstate.tables.edges[E].left,
-                      pstate.tables.edges[E].right,
-                      pstate.tables.edges[E].parent,
-                      pstate.tables.edges[E].child)
+        while (
+            E < len(pstate.tables.edges)
+            and E <= w[i + 1]
+            and w[i + 1] < len(pstate.tables.edges)
+        ):
+            e.add_row(
+                pstate.tables.edges[E].left,
+                pstate.tables.edges[E].right,
+                pstate.tables.edges[E].parent,
+                pstate.tables.edges[E].child,
+            )
             E += 1
 
 while E < len(pstate.tables.edges):
-    e.add_row(pstate.tables.edges[E].left,
-              pstate.tables.edges[E].right,
-              pstate.tables.edges[E].parent,
-              pstate.tables.edges[E].child)
+    e.add_row(
+        pstate.tables.edges[E].left,
+        pstate.tables.edges[E].right,
+        pstate.tables.edges[E].parent,
+        pstate.tables.edges[E].child,
+    )
     E += 1
 
 assert e == pstate.tables.edges
@@ -155,14 +171,13 @@ pstate.pnodes = [(i.n0, i.n1) for i in pstate.parents]
 # Annoyance arising from recording time forwards:
 flags = np.zeros(len(pstate.tables.nodes), dtype=np.uint32)
 ot = np.copy(pstate.tables.nodes.time)
-newtime = np.array([pstate.current_generation -
-                    i for i in pstate.tables.nodes.time])
+newtime = np.array([pstate.current_generation - i for i in pstate.tables.nodes.time])
 pstate.tables.nodes.set_columns(flags=flags, time=newtime)
 
 # Validate that we've not screwed up parent birth times
 # NOTE: gotta thing forwards
 for i in range(2, len(pstate.tables.edges)):
-    e = pstate.tables.edges[i-1]
+    e = pstate.tables.edges[i - 1]
     ee = pstate.tables.edges[i]
     t = pstate.tables.nodes.time[e.parent]
     tt = pstate.tables.nodes.time[ee.parent]
@@ -186,10 +201,15 @@ for p in pstate.parents:
     flags[p.n1] = 1
 
 tcopy.nodes.set_columns(
-    flags=flags, time=-1.0*(pstate.tables.nodes.time - pstate.tables.nodes.time.max()))
+    flags=flags, time=-1.0 * (pstate.tables.nodes.time - pstate.tables.nodes.time.max())
+)
 
-tcopy.edges.set_columns(pstate.tables.edges.left, pstate.tables.edges.right,
-                        pstate.tables.edges.parent, pstate.tables.edges.child)
+tcopy.edges.set_columns(
+    pstate.tables.edges.left,
+    pstate.tables.edges.right,
+    pstate.tables.edges.parent,
+    pstate.tables.edges.child,
+)
 num_edges = len(tcopy.edges)
 for eb in pstate.buffered_edges:
     for i in eb[0] + eb[1]:
@@ -199,11 +219,17 @@ tcopy_num_edges_b4_simplify = len(tcopy.edges)
 idmap = tcopy.simplify()
 samples = np.where(flags == 1)[0]
 ts = tcopy.tree_sequence()
-node_colors = {idmap[i]: 'green' for i in samples}
+node_colors = {idmap[i]: "green" for i in samples}
 node_labels = {idmap[i]: ts.tables.nodes.time[idmap[i]] for i in samples}
 t = next(ts.trees())
-t.draw(path="tree_eb_multiple_step2a.svg", format="svg", height=1000,
-       width=1000, node_colours=node_colors, node_labels=node_labels)
+t.draw(
+    path="tree_eb_multiple_step2a.svg",
+    format="svg",
+    height=1000,
+    width=1000,
+    node_colours=node_colors,
+    node_labels=node_labels,
+)
 
 # for i, eb in enumerate(pstate.buffered_edges):
 #     p1, p2 = tskit.NULL, tskit.NULL
@@ -225,7 +251,8 @@ t.draw(path="tree_eb_multiple_step2a.svg", format="svg", height=1000,
 #             print(p2, pstate.tables.edges.parent[prev2])
 
 pstate.tables.nodes.set_columns(
-    flags=flags, time=-1.0*(pstate.tables.nodes.time - pstate.tables.nodes.time.max()))
+    flags=flags, time=-1.0 * (pstate.tables.nodes.time - pstate.tables.nodes.time.max())
+)
 
 new_edges = 0
 for e in pstate.buffered_edges:
@@ -251,8 +278,14 @@ for o in reversed(pstate.generation_offsets):
             pnodes = pstate.pnodes[i]
             where0 = pwhere[i][1]
             where1 = pwhere[i][2]
-            print("sanity:", pnodes, isparent[pnodes[0]],
-                  ischild[pnodes[0]], isparent[pnodes[1]], ischild[pnodes[1]])
+            print(
+                "sanity:",
+                pnodes,
+                isparent[pnodes[0]],
+                ischild[pnodes[0]],
+                isparent[pnodes[1]],
+                ischild[pnodes[1]],
+            )
 
             if isparent[pnodes[0]] and isparent[pnodes[1]]:
                 # w = np.where(pstate.tables.edges.parent[E:] == pnodes[0])[0]
@@ -261,11 +294,12 @@ for o in reversed(pstate.generation_offsets):
                 # assert E+w[-1] == maxparent[pnodes[0]
                 #                             ], f"{E+w[-1]} {maxparent[pnodes[0]]}"
                 temp_edges_from_before.append_columns(
-                    pstate.tables.edges.left[E:maxparent[pnodes[0]]+1],
-                    pstate.tables.edges.right[E:maxparent[pnodes[0]]+1],
-                    pstate.tables.edges.parent[E:maxparent[pnodes[0]]+1],
-                    pstate.tables.edges.child[E:maxparent[pnodes[0]]+1])
-                E = maxparent[pnodes[0]]+1
+                    pstate.tables.edges.left[E : maxparent[pnodes[0]] + 1],
+                    pstate.tables.edges.right[E : maxparent[pnodes[0]] + 1],
+                    pstate.tables.edges.parent[E : maxparent[pnodes[0]] + 1],
+                    pstate.tables.edges.child[E : maxparent[pnodes[0]] + 1],
+                )
+                E = maxparent[pnodes[0]] + 1
                 # temp_edges_from_before.append_columns(
                 #         pstate.tables.edges.left[E:][:w[-1]+1],
                 #         pstate.tables.edges.right[E:][:w[-1]+1],
@@ -280,11 +314,12 @@ for o in reversed(pstate.generation_offsets):
                 # assert E+w[-1] == maxparent[pnodes[1]
                 #                             ], f"{E+w[-1]} {maxparent[pnodes[1]]}"
                 temp_edges_from_before.append_columns(
-                    pstate.tables.edges.left[E:maxparent[pnodes[1]]+1],
-                    pstate.tables.edges.right[E:maxparent[pnodes[1]]+1],
-                    pstate.tables.edges.parent[E:maxparent[pnodes[1]]+1],
-                    pstate.tables.edges.child[E:maxparent[pnodes[1]]+1])
-                E = maxparent[pnodes[1]]+1
+                    pstate.tables.edges.left[E : maxparent[pnodes[1]] + 1],
+                    pstate.tables.edges.right[E : maxparent[pnodes[1]] + 1],
+                    pstate.tables.edges.parent[E : maxparent[pnodes[1]] + 1],
+                    pstate.tables.edges.child[E : maxparent[pnodes[1]] + 1],
+                )
+                E = maxparent[pnodes[1]] + 1
                 # temp_edges_from_before.append_columns(
                 #         pstate.tables.edges.left[E:][:w[-1]+1],
                 #         pstate.tables.edges.right[E:][:w[-1]+1],
@@ -300,11 +335,12 @@ for o in reversed(pstate.generation_offsets):
                 # assert E+w[-1] == maxparent[pnodes[0]
                 #                             ], f"{E+w[-1]} {maxparent[pnodes[0]]}"
                 temp_edges_from_before.append_columns(
-                    pstate.tables.edges.left[E:maxparent[pnodes[0]]+1],
-                    pstate.tables.edges.right[E:maxparent[pnodes[0]]+1],
-                    pstate.tables.edges.parent[E:maxparent[pnodes[0]]+1],
-                    pstate.tables.edges.child[E:maxparent[pnodes[0]]+1])
-                E = maxparent[pnodes[0]]+1
+                    pstate.tables.edges.left[E : maxparent[pnodes[0]] + 1],
+                    pstate.tables.edges.right[E : maxparent[pnodes[0]] + 1],
+                    pstate.tables.edges.parent[E : maxparent[pnodes[0]] + 1],
+                    pstate.tables.edges.child[E : maxparent[pnodes[0]] + 1],
+                )
+                E = maxparent[pnodes[0]] + 1
                 # temp_edges_from_before.append_columns(
                 #         pstate.tables.edges.left[E:][:w[-1]+1],
                 #         pstate.tables.edges.right[E:][:w[-1]+1],
@@ -322,10 +358,11 @@ for o in reversed(pstate.generation_offsets):
                 # assert E+w[-1] == maxparent[pnodes[1]
                 #                             ], f"{E+w[-1]} {maxparent[pnodes[1]]}"
                 temp_edges_from_before.append_columns(
-                    pstate.tables.edges.left[E:minparent[pnodes[1]]],
-                    pstate.tables.edges.right[E:minparent[pnodes[1]]],
-                    pstate.tables.edges.parent[E:minparent[pnodes[1]]],
-                    pstate.tables.edges.child[E:minparent[pnodes[1]]])
+                    pstate.tables.edges.left[E : minparent[pnodes[1]]],
+                    pstate.tables.edges.right[E : minparent[pnodes[1]]],
+                    pstate.tables.edges.parent[E : minparent[pnodes[1]]],
+                    pstate.tables.edges.child[E : minparent[pnodes[1]]],
+                )
                 # temp_edges_from_before.append_columns(
                 #        pstate.tables.edges.left[E:][:w[0]],
                 #        pstate.tables.edges.right[E:][:w[0]],
@@ -334,20 +371,34 @@ for o in reversed(pstate.generation_offsets):
                 for k in pstate.buffered_edges[i][0]:
                     temp_edges_from_before.add_row(*k)
                 temp_edges_from_before.append_columns(
-                    pstate.tables.edges.left[minparent[pnodes[1]]:maxparent[pnodes[1]]+1],
-                    pstate.tables.edges.right[minparent[pnodes[1]]:maxparent[pnodes[1]]+1],
-                    pstate.tables.edges.parent[minparent[pnodes[1]]:maxparent[pnodes[1]]+1],
-                    pstate.tables.edges.child[minparent[pnodes[1]]:maxparent[pnodes[1]]+1])
+                    pstate.tables.edges.left[
+                        minparent[pnodes[1]] : maxparent[pnodes[1]] + 1
+                    ],
+                    pstate.tables.edges.right[
+                        minparent[pnodes[1]] : maxparent[pnodes[1]] + 1
+                    ],
+                    pstate.tables.edges.parent[
+                        minparent[pnodes[1]] : maxparent[pnodes[1]] + 1
+                    ],
+                    pstate.tables.edges.child[
+                        minparent[pnodes[1]] : maxparent[pnodes[1]] + 1
+                    ],
+                )
                 for k in pstate.buffered_edges[i][1]:
                     temp_edges_from_before.add_row(*k)
                 E = maxparent[pnodes[1]] + 1
             else:
                 ptime = pstate.tables.nodes.time[pnodes[0]]
                 if ischild[pnodes[0]] or ischild[pnodes[1]]:
-                    while E < len(pstate.tables.edges) and pstate.tables.nodes.time[pstate.tables.edges.parent[E]] < ptime:
+                    while (
+                        E < len(pstate.tables.edges)
+                        and pstate.tables.nodes.time[pstate.tables.edges.parent[E]]
+                        < ptime
+                    ):
                         e = pstate.tables.edges[E]
                         temp_edges_from_before.add_row(
-                            e.left, e.right, e.parent, e.child)
+                            e.left, e.right, e.parent, e.child
+                        )
                         E += 1
 
                 for n in [0, 1]:
@@ -400,7 +451,7 @@ for o in reversed(pstate.generation_offsets):
         #                     pstate.tables.edges[E].child)
         #                 E += 1
         #             print("done with pre-existing parent edges")
-            # else:
+        # else:
 
 while E < len(pstate.tables.edges):
     print(f"5: adding {pstate.tables.edges[E]}")
@@ -408,7 +459,8 @@ while E < len(pstate.tables.edges):
         pstate.tables.edges[E].left,
         pstate.tables.edges[E].right,
         pstate.tables.edges[E].parent,
-        pstate.tables.edges[E].child)
+        pstate.tables.edges[E].child,
+    )
     E += 1
 
 for e in temp_edges_from_before:
@@ -416,8 +468,14 @@ for e in temp_edges_from_before:
     print(f"edges: {e} -> {np.diff(z)}")
 
 
-print("result", edges_added, new_edges2, new_edges2 + len(pstate.tables.edges), tcopy_num_edges_b4_simplify,
-      len(temp_edges) + len(temp_edges_from_before))
+print(
+    "result",
+    edges_added,
+    new_edges2,
+    new_edges2 + len(pstate.tables.edges),
+    tcopy_num_edges_b4_simplify,
+    len(temp_edges) + len(temp_edges_from_before),
+)
 # assert new_edges == new_edges2
 print(len(pstate.tables.edges), len(temp_edges), new_edges2)
 
@@ -426,7 +484,7 @@ print(np.where(temp_edges_from_before.parent == 44)[0])
 
 # Test parent order prior to merging the two tables together.
 for i in range(2, len(temp_edges)):
-    ei = temp_edges[i-1]
+    ei = temp_edges[i - 1]
     eip1 = temp_edges[i]
     ti = pstate.tables.nodes.time[ei.parent]
     tip1 = pstate.tables.nodes.time[eip1.parent]
@@ -436,7 +494,7 @@ for i in range(2, len(temp_edges)):
         sys.exit(0)
 
 for i in range(2, len(temp_edges_from_before)):
-    ei = temp_edges_from_before[i-1]
+    ei = temp_edges_from_before[i - 1]
     eip1 = temp_edges_from_before[i]
     ti = pstate.tables.nodes.time[ei.parent]
     tip1 = pstate.tables.nodes.time[eip1.parent]
@@ -445,11 +503,14 @@ for i in range(2, len(temp_edges_from_before)):
         print("unsorted from b4")
 
 pstate.tables.edges.set_columns(
-    temp_edges.left, temp_edges.right, temp_edges.parent, temp_edges.child)
+    temp_edges.left, temp_edges.right, temp_edges.parent, temp_edges.child
+)
 pstate.tables.edges.append_columns(
-    temp_edges_from_before.left, temp_edges_from_before.right,
+    temp_edges_from_before.left,
+    temp_edges_from_before.right,
     temp_edges_from_before.parent,
-    temp_edges_from_before.child)
+    temp_edges_from_before.child,
+)
 
 # Test contiguity
 up = np.unique(pstate.tables.edges.parent)
@@ -465,7 +526,7 @@ for u in up:
 
 # Test parent order
 for i in range(2, len(pstate.tables.edges)):
-    ei = pstate.tables.edges[i-1]
+    ei = pstate.tables.edges[i - 1]
     eip1 = pstate.tables.edges[i]
     ti = pstate.tables.nodes.time[ei.parent]
     tip1 = pstate.tables.nodes.time[eip1.parent]
@@ -483,9 +544,15 @@ print(tcopy_num_edges_b4_simplify, len(pstate.tables.edges))
 idmap = pstate.tables.simplify()
 ts2 = pstate.tables.tree_sequence()
 t = next(ts2.trees())
-node_colors = {idmap[i]: 'green' for i in samples}
+node_colors = {idmap[i]: "green" for i in samples}
 node_labels = {idmap[i]: ts.tables.nodes.time[idmap[i]] for i in samples}
-t.draw(path="tree_eb_multiple_step2b.svg", format="svg", height=1000,
-       width=1000, node_colours=node_colors, node_labels=node_labels)
+t.draw(
+    path="tree_eb_multiple_step2b.svg",
+    format="svg",
+    height=1000,
+    width=1000,
+    node_colours=node_colors,
+    node_labels=node_labels,
+)
 print(len(pstate.tables.edges), len(temp_edges), new_edges2)
 print(len(ts.tables.edges), len(ts2.tables.edges))
