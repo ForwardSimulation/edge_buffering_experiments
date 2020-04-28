@@ -58,11 +58,81 @@ def get_alive_nodes(parents: typing.List[IndexAndNodes]):
     return alive_nodes
 
 
+def add_most_ancient_edges(
+    tables: tskit.TableCollection, stitched_edges: tskit.EdgeTable, time: float
+):
+    """
+    TODO: docstring
+    """
+    edge_offset = 0
+    # FIXME: can be more efficient via a set_columns call
+    while (
+        edge_offset < len(tables.edges)
+        and tables.nodes.time[tables.edges.parent[edge_offset]] > time
+    ):
+        e = tables.edges.parent[edge_offset]
+        stitched_edges.add_row(
+            left=e.left, right=e.right, parent=e.parent, child=e.child
+        )
+        edge_offset += 1
+    return edge_offset
+
+
+def handle_alive_nodes_from_last_time(
+    tables: tskit.TableCollection,
+    stitched_edges: tskit.EdgeTable,
+    alive_at_last_simplification: np.array,
+    buffered_edges: typing.List[BufferedEdgeList],
+    edge_offset: int,
+):
+    """
+    TODO: docstring
+    """
+    A = 0
+    while A < len(alive_at_last_simplification):
+        a = alive_at_last_simplification[A]
+        while edge_offset < len(tables.edges) and (
+            tables.edges.parent[edge_offset] == a
+            or tables.nodes.time[tables.edges.parent[edge_offset]]
+            > tables.nodes.time[a]
+        ):
+            e = tables.edges.parent[edge_offset]
+            stitched_edges.add_row(
+                left=e.left, right=e.right, parent=e.parent, child=e.child
+            )
+            edge_offset += 1
+        for birth in buffered_edges[a]:
+            stitched_edges.add_row(
+                left=birth.left, right=birth.right, parent=a, child=birth.child
+            )
+        A += 1
+
+    return edge_offset
+
+
 def stitch_tables(
     tables: tskit.TableCollection,
     buffered_edges: typing.List[BufferedEdgeList],
     alive_at_last_simplification: np.array,
 ):
+    """
+    TODO: docstring w/details
+    """
+    stitched_edges = tskit.EdgeTable()
+    time = -1.0
+    if len(alive_at_last_simplification) > 0:
+        time = tables.nodes.time[alive_at_last_simplification].max()
+    edge_offset = add_most_ancient_edges(tables, stitched_edges, time)
+    edge_offset = handle_alive_nodes_from_last_time(
+        tables,
+        stitched_edges,
+        alive_at_last_simplification,
+        buffered_edges,
+        edge_offset,
+    )
+
+    print(len(alive_at_last_simplification), edge_offset, stitched_edges)
+
     return tables
 
 
