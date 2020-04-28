@@ -21,7 +21,7 @@ class BufferedEdgeList(object):
 
 
 @attr.s()
-class Individual(object):
+class IndexAndNodes(object):
     """
     Double-purpose class:
 
@@ -45,13 +45,13 @@ def sort_alive_at_last_simplification(alive, tables):
     return alive
 
 
-def pass_on_node(parent: Individual):
+def pass_on_node(parent: IndexAndNodes):
     if np.random.uniform() < 0.5:
         return parent.node0
     return parent.node1
 
 
-def get_alive_nodes(parents: typing.List[Individual]):
+def get_alive_nodes(parents: typing.List[IndexAndNodes]):
     alive_nodes = []
     for p in parents:
         alive_nodes.extend(p.nodes)
@@ -61,7 +61,7 @@ def get_alive_nodes(parents: typing.List[Individual]):
 def wright_fisher(
     N: int, ngens: int, psurvival: float, simplification_period: int = 10
 ):
-    parents = [Individual(i, 2 * i, 2 * i + 1) for i in range(N)]
+    parents = [IndexAndNodes(i, 2 * i, 2 * i + 1) for i in range(N)]
     tables = tskit.TableCollection(1.0)
     for _ in range(2 * N):
         tables.nodes.add_row(time=ngens)
@@ -84,7 +84,7 @@ def wright_fisher(
                 p1node = pass_on_node(parents[offspring_parents[1]])
                 # parent_list[i] will be replaced
                 # by an individual inheriting these two nodes
-                dead.append(Individual(i, p0node, p1node))
+                dead.append(IndexAndNodes(i, p0node, p1node))
         for d in dead:
             # Register two new nodes
             new_node_0 = tables.nodes.add_row(time=gen - 1)
@@ -105,7 +105,7 @@ def wright_fisher(
             )
 
             # Make the new parent
-            parents[d.index] = Individual(d.index, new_node_0, new_node_1)
+            parents[d.index] = IndexAndNodes(d.index, new_node_0, new_node_1)
 
         # Simplify, if it is time to
         if gen < ngens and gen % simplification_period == 0.0:
