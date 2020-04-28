@@ -58,6 +58,14 @@ def get_alive_nodes(parents: typing.List[IndexAndNodes]):
     return alive_nodes
 
 
+def stitch_tables(
+    tables: tskit.TableCollection,
+    buffered_edges: typing.List[BufferedEdgeList],
+    alive_at_last_simplification: np.array,
+):
+    return tables
+
+
 def wright_fisher(
     N: int, ngens: int, psurvival: float, simplification_period: int = 10
 ):
@@ -110,8 +118,7 @@ def wright_fisher(
         # Simplify, if it is time to
         if gen < ngens and gen % simplification_period == 0.0:
             alive_nodes = get_alive_nodes(parents)
-            for a in alive_at_last_simplification:
-                pass
+            tables = stitch_tables(tables, buffered_edges, alive_at_last_simplification)
 
     return tables, get_alive_nodes(parents)
 
