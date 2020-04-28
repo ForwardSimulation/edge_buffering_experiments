@@ -142,20 +142,39 @@ def stitch_tables(
     """
     TODO: docstring w/details
     """
+    if len(tables.edges) == 0:
+        # this is our first simplification
+        for b in reversed(buffered_edges):
+            for d in b.descendants:
+                tables.edges.add_row(
+                    left=d.left, right=d.right, parent=b.parent, child=d.child
+                )
+        return tables
+
     stitched_edges = tskit.EdgeTable()
-    time = -1.0
-    if len(alive_at_last_simplification) > 0:
-        time = tables.nodes.time[alive_at_last_simplification].max()
-    edge_offset = add_most_ancient_edges(tables, stitched_edges, time)
-    edge_offset = handle_alive_nodes_from_last_time(
-        tables,
-        stitched_edges,
-        alive_at_last_simplification,
-        buffered_edges,
-        edge_offset,
-    )
-    finish_initial_liftover(tables, stitched_edges, edge_offset)
-    add_new_edges(tables, stitched_edges, buffered_edges, time)
+    for b in reversed(buffered_edges):
+        for d in b.descendants:
+            stitched_edges.add_row(
+                left=d.left, right=d.right, parent=b.parent, child=d.child
+            )
+    for e in tables.edges:
+        stitched_edges.add_row(
+            left=e.left, right=e.right, parent=e.parent, child=e.child
+        )
+
+    # time = -1.0
+    # if len(alive_at_last_simplification) > 0:
+    #     time = tables.nodes.time[alive_at_last_simplification].max()
+    # edge_offset = add_most_ancient_edges(tables, stitched_edges, time)
+    # edge_offset = handle_alive_nodes_from_last_time(
+    #     tables,
+    #     stitched_edges,
+    #     alive_at_last_simplification,
+    #     buffered_edges,
+    #     edge_offset,
+    # )
+    # finish_initial_liftover(tables, stitched_edges, edge_offset)
+    # add_new_edges(tables, stitched_edges, buffered_edges, time)
 
     tables.edges.set_columns(
         left=stitched_edges.left,
@@ -167,9 +186,32 @@ def stitch_tables(
     return tables
 
 
+def flush_edges_and_simplify(
+    sample_nodes, parents, alive_at_last_simplification, buffered_edges, tables
+):
+    tables = stitch_tables(tables, buffered_edges, alive_at_last_simplification)
+    idmap = tables.simplify(sample_nodes)
+    alive_nodes = idmap[sample_nodes]
+    alive_nodes = alive_nodes[np.where(alive_nodes != tskit.NULL)]
+    alive_nodes = sort_alive_at_last_simplification(alive_nodes, tables)
+
+    # One of Python's worst gotchas ;)
+    buffered_edges[:] = [BufferedEdgeList(i) for i in range(len(tables.nodes))]
+
+    for p in parents:
+        p.node0 = idmap[p.node0]
+        p.node1 = idmap[p.node1]
+
+
+def simplify_classic(sample_nodes, tables):
+    tables.sort()
+    tables.simplify(sample_nodes)
+
+
 def wright_fisher(
     N: int, ngens: int, psurvival: float, simplification_period: int = 10
 ):
+    assert psurvival == 0.0, "Let's not get ahead of ourselves"
     parents = [IndexAndNodes(i, 2 * i, 2 * i + 1) for i in range(N)]
     tables = tskit.TableCollection(1.0)
     tables2 = tskit.TableCollection(1.0)
@@ -209,8 +251,12 @@ def wright_fisher(
             buffered_edges.append(BufferedEdgeList(new_node_1))
 
             # Register the edges -- this is the standard method
-            tables2.edges.add_row(left=0.0, right=1.0, parent=d.node0, child=new_node_0)
-            tables2.edges.add_row(left=0.0, right=1.0, parent=d.node1, child=new_node_1)
+            tables2.edges.add_row(
+                left=0.0, right=1.0, parent=d.node0, child=new_node_0b
+            )
+            tables2.edges.add_row(
+                left=0.0, right=1.0, parent=d.node1, child=new_node_1b
+            )
 
             # Buffer the new edges
             buffered_edges[d.node0].descendants.append(
@@ -225,34 +271,34 @@ def wright_fisher(
 
         # Simplify, if it is time to
         if gen < ngens and gen % simplification_period == 0.0:
-            alive_nodes = get_alive_nodes(parents)
-            for e in tables2.edges:
-                print(e.parent, tables2.nodes.time[e.parent])
-            tables2.sort()
-            print("//")
-            for e in tables2.edges:
-                print(e.parent, tables2.nodes.time[e.parent])
-            tables2.simplify(alive_nodes)
-            tables = stitch_tables(tables, buffered_edges, alive_at_last_simplification)
-            idmap = tables.simplify(alive_nodes)
-            alive_nodes = idmap[alive_nodes]
-            alive_nodes = alive_nodes[np.where(alive_nodes != tskit.NULL)]
-            alive_nodes = sort_alive_at_last_simplification(alive_nodes, tables)
+            sample_nodes = get_alive_nodes(parents)
+            flush_edges_and_simplify(
+                sample_nodes,
+                parents,
+                alive_at_last_simplification,
+                buffered_edges,
+                tables,
+            )
+            simplify_classic(sample_nodes, tables2)
+            assert len(tables.nodes) == len(tables2.nodes)
+            assert len(tables.edges) == len(tables2.edges)
+            assert np.array_equal(tables.nodes.time, tables2.nodes.time)
+            simplified = True
+        else:
+            simplified = False
+    if not simplified:
+        sample_nodes = get_alive_nodes(parents)
+        flush_edges_and_simplify(
+            sample_nodes, parents, alive_at_last_simplification, buffered_edges, tables,
+        )
+        simplify_classic(sample_nodes, tables2)
 
-            buffered_edges = [BufferedEdgeList(i) for i in range(len(tables.nodes))]
-
-            for p in parents:
-                p.node0 = idmap[p.node0]
-                p.node1 = idmap[p.node1]
-            # print(buffered_edges)
-    print("gen=", gen)
-    return tables, get_alive_nodes(parents)
+    return tables, tables2
 
 
-tables, alive_nodes = wright_fisher(10, 100, 0.5, 3)
-for i in tables.edges:
-    print(i, tables.nodes.time[i.parent], tables.nodes.time[i.child])
-tables.sort()
-tables.simplify(alive_nodes)
+tables, tables2 = wright_fisher(500, 5000, 0.0, 333)
+assert np.array_equal(tables.nodes.time, tables2.nodes.time)
 ts = tables.tree_sequence()
-ts.first().draw(format="svg", path="foo.svg")
+ts.first().draw(format="svg", path="foo.svg", height=5000, width=5000)
+ts = tables2.tree_sequence()
+ts.first().draw(format="svg", path="foo2.svg", height=5000, width=5000)
