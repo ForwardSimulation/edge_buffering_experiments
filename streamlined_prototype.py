@@ -128,7 +128,6 @@ def finish_initial_liftover(
 def add_new_edges(tables, stitched_edges, buffered_edges, time):
     for b in reversed(buffered_edges):
         if tables.nodes.time[b.parent] > time:
-            print(time, b.parent, tables.nodes.time[b.parent])
             for d in b.descendants:
                 stitched_edges.add_row(
                     left=d.left, right=d.right, parent=b.parent, child=d.child
@@ -158,7 +157,6 @@ def stitch_tables(
     finish_initial_liftover(tables, stitched_edges, edge_offset)
     add_new_edges(tables, stitched_edges, buffered_edges, time)
 
-    print(len(alive_at_last_simplification), edge_offset, stitched_edges)
     tables.edges.set_columns(
         left=stitched_edges.left,
         right=stitched_edges.right,
@@ -174,8 +172,10 @@ def wright_fisher(
 ):
     parents = [IndexAndNodes(i, 2 * i, 2 * i + 1) for i in range(N)]
     tables = tskit.TableCollection(1.0)
+    tables2 = tskit.TableCollection(1.0)
     for _ in range(2 * N):
         tables.nodes.add_row(time=ngens)
+        tables2.nodes.add_row(time=ngens)
     alive_at_last_simplification = np.array([], dtype=np.int32)
 
     buffered_edges = []
@@ -200,12 +200,17 @@ def wright_fisher(
             # Register two new nodes
             new_node_0 = tables.nodes.add_row(time=gen - 1)
             new_node_1 = tables.nodes.add_row(time=gen - 1)
+            new_node_0b = tables2.nodes.add_row(time=gen - 1)
+            new_node_1b = tables2.nodes.add_row(time=gen - 1)
+            assert new_node_0 == new_node_0b, f"{new_node_0} {new_node_0b}"
+            assert new_node_1 == new_node_1b, f"{new_node_1} {new_node_1b}"
+
             buffered_edges.append(BufferedEdgeList(new_node_0))
             buffered_edges.append(BufferedEdgeList(new_node_1))
 
             # Register the edges -- this is the standard method
-            # tables.edges.add_row(left=0.0, right=1.0, parent=d.node0, child=new_node_0)
-            # tables.edges.add_row(left=0.0, right=1.0, parent=d.node1, child=new_node_1)
+            tables2.edges.add_row(left=0.0, right=1.0, parent=d.node0, child=new_node_0)
+            tables2.edges.add_row(left=0.0, right=1.0, parent=d.node1, child=new_node_1)
 
             # Buffer the new edges
             buffered_edges[d.node0].descendants.append(
@@ -221,6 +226,13 @@ def wright_fisher(
         # Simplify, if it is time to
         if gen < ngens and gen % simplification_period == 0.0:
             alive_nodes = get_alive_nodes(parents)
+            for e in tables2.edges:
+                print(e.parent, tables2.nodes.time[e.parent])
+            tables2.sort()
+            print("//")
+            for e in tables2.edges:
+                print(e.parent, tables2.nodes.time[e.parent])
+            tables2.simplify(alive_nodes)
             tables = stitch_tables(tables, buffered_edges, alive_at_last_simplification)
             idmap = tables.simplify(alive_nodes)
             alive_nodes = idmap[alive_nodes]
@@ -237,7 +249,7 @@ def wright_fisher(
     return tables, get_alive_nodes(parents)
 
 
-tables, alive_nodes = wright_fisher(10, 100, 0.5)
+tables, alive_nodes = wright_fisher(10, 100, 0.5, 3)
 for i in tables.edges:
     print(i, tables.nodes.time[i.parent], tables.nodes.time[i.child])
 tables.sort()
