@@ -65,7 +65,7 @@ def wright_fisher(
     tables = tskit.TableCollection(1.0)
     for _ in range(2 * N):
         tables.nodes.add_row(time=ngens)
-    alive_at_last_simplification = [_ for _ in parents]
+    alive_at_last_simplification = np.array([], dtype=np.int32)
 
     buffered_edges = []
     for p in parents:
@@ -110,14 +110,8 @@ def wright_fisher(
         # Simplify, if it is time to
         if gen < ngens and gen % simplification_period == 0.0:
             alive_nodes = get_alive_nodes(parents)
-            alive_nodes_at_last_simplification = get_alive_nodes(
-                alive_at_last_simplification
-            )
-            alive_nodes_at_last_simplification = sort_alive_at_last_simplification(
-                alive_nodes_at_last_simplification, tables
-            )
-
-            alive_at_last_simplification = [_ for _ in parents]
+            for a in alive_at_last_simplification:
+                pass
 
     return tables, get_alive_nodes(parents)
 
