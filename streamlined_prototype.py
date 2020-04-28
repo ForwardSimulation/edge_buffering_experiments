@@ -16,7 +16,7 @@ class BufferedEdge(object):
 
 @attr.s(kw_only=False)
 class BufferedEdgeList(object):
-    parent: np.int32 = attr.ib(converter=float)
+    parent: np.int32 = attr.ib(converter=int)
     descendants: typing.List[BufferedEdge] = attr.ib(converter=list, factory=list)
 
 
@@ -55,7 +55,7 @@ def get_alive_nodes(parents: typing.List[IndexAndNodes]):
     alive_nodes = []
     for p in parents:
         alive_nodes.extend(p.nodes)
-    return alive_nodes
+    return np.array(alive_nodes, dtype=np.int32)
 
 
 def add_most_ancient_edges(
@@ -70,7 +70,7 @@ def add_most_ancient_edges(
         edge_offset < len(tables.edges)
         and tables.nodes.time[tables.edges.parent[edge_offset]] > time
     ):
-        e = tables.edges.parent[edge_offset]
+        e = tables.edges[edge_offset]
         stitched_edges.add_row(
             left=e.left, right=e.right, parent=e.parent, child=e.child
         )
@@ -107,7 +107,32 @@ def handle_alive_nodes_from_last_time(
             )
         A += 1
 
+    assert A == len(alive_at_last_simplification)
+
     return edge_offset
+
+
+def finish_initial_liftover(
+    tables: tskit.TableCollection, stitched_edges: tskit.EdgeTable, edge_offset: int
+):
+    while edge_offset < len(tables.edges):
+        stitched_edges.add_row(
+            left=tables.edges.left[edge_offset],
+            right=tables.edges.right[edge_offset],
+            parent=tables.edges.parent[edge_offset],
+            child=tables.edges.child[edge_offset],
+        )
+        edge_offset += 1
+
+
+def add_new_edges(tables, stitched_edges, buffered_edges, time):
+    for b in reversed(buffered_edges):
+        if tables.nodes.time[b.parent] > time:
+            print(time, b.parent, tables.nodes.time[b.parent])
+            for d in b.descendants:
+                stitched_edges.add_row(
+                    left=d.left, right=d.right, parent=b.parent, child=d.child
+                )
 
 
 def stitch_tables(
@@ -130,8 +155,16 @@ def stitch_tables(
         buffered_edges,
         edge_offset,
     )
+    finish_initial_liftover(tables, stitched_edges, edge_offset)
+    add_new_edges(tables, stitched_edges, buffered_edges, time)
 
     print(len(alive_at_last_simplification), edge_offset, stitched_edges)
+    tables.edges.set_columns(
+        left=stitched_edges.left,
+        right=stitched_edges.right,
+        parent=stitched_edges.parent,
+        child=stitched_edges.child,
+    )
 
     return tables
 
@@ -189,7 +222,18 @@ def wright_fisher(
         if gen < ngens and gen % simplification_period == 0.0:
             alive_nodes = get_alive_nodes(parents)
             tables = stitch_tables(tables, buffered_edges, alive_at_last_simplification)
+            idmap = tables.simplify(alive_nodes)
+            alive_nodes = idmap[alive_nodes]
+            alive_nodes = alive_nodes[np.where(alive_nodes != tskit.NULL)]
+            alive_nodes = sort_alive_at_last_simplification(alive_nodes, tables)
 
+            buffered_edges = [BufferedEdgeList(i) for i in range(len(tables.nodes))]
+
+            for p in parents:
+                p.node0 = idmap[p.node0]
+                p.node1 = idmap[p.node1]
+            # print(buffered_edges)
+    print("gen=", gen)
     return tables, get_alive_nodes(parents)
 
 
