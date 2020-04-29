@@ -44,7 +44,7 @@ def sort_alive_at_last_simplification(alive: np.ndarray, tables: tskit.TableColl
     Sorts nodes "pastwards" in time.
     """
     alive = np.array(
-        sorted(alive, key=lambda x: (-tables.nodes.time[x], -x)), dtype=alive.dtype
+        sorted(alive, key=lambda x: (tables.nodes.time[x], x)), dtype=alive.dtype
     )
 
     return alive
@@ -90,23 +90,54 @@ def handle_alive_nodes_from_last_time(
     buffered_edges: typing.List[BufferedEdgeList],
 ):
     """
-    TODO: docstring
+    This is the hard part.  When generations overlap,
+    samples that were alive when we last simplified
+    may have birth times older than the last simplification
+    and died since it happened.  Thus, they may leave new
+    edges since we last simplified AND be associated
+    with edges already in the edge table.
+
+    The additional complication is that we are recording edges
+    by birth time (past to present), but our pre-existing edges
+    are ordered present to past by birth time.
     """
     A = 0
-    edge_offset = len(tables.edges) - 1
+    # Find the first with descendants
+    while A < len(alive_at_last_simplification):
+        if len(buffered_edges[alive_at_last_simplification[A]].descendants) > 0:
+            break
+        A += 1
+    # Get the range of times spanned by these samples
+    most_recent = tables.nodes.time[alive_at_last_simplification].min()
+    most_ancient = tables.nodes.time[alive_at_last_simplification].max()
+    edge_offset = 0
+    foo = None
+    if edge_offset < len(tables.edges):
+        foo = tables.nodes.time[tables.edges.parent[edge_offset]]
+    print(most_recent, most_recent, foo)
+    while (
+        edge_offset < len(tables.edges)
+        and tables.nodes.time[tables.edges.parent[edge_offset]] > most_recent
+    ):
+        edge_offset += 1
+    # if edge_offset == len(tables.edges):
+    #     print("early out")
+    #     return edge_offset
+    print("chk", edge_offset, len(tables.edges))
+
     while A < len(alive_at_last_simplification):
         a = alive_at_last_simplification[A]
-        while edge_offset >= 0 and (
+        while edge_offset < len(tables.edges) and (
             tables.edges.parent[edge_offset] == a
             or tables.nodes.time[tables.edges.parent[edge_offset]]
-            > tables.nodes.time[a]
+            >= tables.nodes.time[a]
         ):
-            e = tables.edges.parent[edge_offset]
+            e = tables.edges[edge_offset]
             stitched_edges.add_row(
                 left=e.left, right=e.right, parent=e.parent, child=e.child
             )
             edge_offset -= 1
-        for birth in buffered_edges[a]:
+        for birth in buffered_edges[a].descendants:
             stitched_edges.add_row(
                 left=birth.left, right=birth.right, parent=a, child=birth.child
             )
@@ -161,13 +192,13 @@ def stitch_tables(
                 )
         return tables
 
-    # Get the time of the most reent node from alive_at_last_simplification
+    # Get the time of the most recent node from alive_at_last_simplification
     time = -1
     if len(alive_at_last_simplification) > 0:
-        time = tables.nodes.time[alive_at_last_simplification].max()
+        time = tables.nodes.time[alive_at_last_simplification].min()
     stitched_edges = tskit.EdgeTable()
     for b in reversed(buffered_edges):
-        if tables.nodes.time[b.parent] > time:
+        if tables.nodes.time[b.parent] < time:
             for d in b.descendants:
                 stitched_edges.add_row(
                     left=d.left, right=d.right, parent=b.parent, child=d.child
@@ -175,13 +206,13 @@ def stitch_tables(
     edge_offset = handle_alive_nodes_from_last_time(
         tables, stitched_edges, alive_at_last_simplification, buffered_edges
     )
-    print(edge_offset, len(tables.edges))
-    for i in range(edge_offset+1):
+    print(edge_offset, len(tables.edges), len(stitched_edges))
+    for i in range(edge_offset):
         e = tables.edges[i]
         stitched_edges.add_row(
             left=e.left, right=e.right, parent=e.parent, child=e.child
         )
-        edge_offset -= 1
+    print(edge_offset, len(tables.edges), len(stitched_edges))
 
     # time = -1.0
     # if len(alive_at_last_simplification) > 0:
@@ -226,6 +257,9 @@ def flush_edges_and_simplify(
     for p in parents:
         p.node0 = idmap[p.node0]
         p.node1 = idmap[p.node1]
+    temp = idmap[sample_nodes]
+    temp = sort_alive_at_last_simplification(temp, tables)
+    return temp
 
 
 def simplify_classic(sample_nodes: np.ndarray, tables: tskit.TableCollection):
@@ -246,7 +280,7 @@ def pairwise_distance_branch(ts: tskit.TreeSequence, samples: np.array):
 def wright_fisher(
     N: int, ngens: int, psurvival: float, simplification_period: int = 10
 ):
-    assert psurvival == 0.0, "Let's not get ahead of ourselves"
+    # assert psurvival == 0.0, "Let's not get ahead of ourselves"
     parents = [IndexAndNodes(i, 2 * i, 2 * i + 1) for i in range(N)]
     tables = tskit.TableCollection(1.0)
     tables2 = tskit.TableCollection(1.0)
@@ -307,7 +341,7 @@ def wright_fisher(
         # Simplify, if it is time to
         if gen < ngens and gen % simplification_period == 0.0:
             sample_nodes = get_alive_nodes(parents)
-            flush_edges_and_simplify(
+            alive_at_last_simplification = flush_edges_and_simplify(
                 sample_nodes,
                 parents,
                 alive_at_last_simplification,
@@ -315,10 +349,13 @@ def wright_fisher(
                 tables,
             )
             simplify_classic(sample_nodes, tables2)
-            assert len(tables.nodes) == len(tables2.nodes)
+            assert len(tables.nodes) == len(
+                tables2.nodes
+            ), f"{len(tables.nodes)}, {len(tables2.nodes)}"
             assert len(tables.edges) == len(tables2.edges)
             assert np.array_equal(tables.nodes.time, tables2.nodes.time)
             simplified = True
+            print(f"done with {gen}")
         else:
             simplified = False
     if not simplified:
