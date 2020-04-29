@@ -208,6 +208,16 @@ def simplify_classic(sample_nodes, tables):
     tables.simplify(sample_nodes)
 
 
+def pairwise_distance_branch(ts: tskit.TreeSequence, samples: np.array):
+    sample_sets = []
+    for i in range(len(samples)):
+        for j in range(i + 1, len(samples)):
+            sample_sets.append([samples[i], samples[j]])
+
+    div = ts.diversity(sample_sets, mode="branch")
+    return div
+
+
 def wright_fisher(
     N: int, ngens: int, psurvival: float, simplification_period: int = 10
 ):
@@ -294,11 +304,3 @@ def wright_fisher(
         simplify_classic(sample_nodes, tables2)
 
     return tables, tables2
-
-
-tables, tables2 = wright_fisher(500, 5000, 0.0, 333)
-assert np.array_equal(tables.nodes.time, tables2.nodes.time)
-ts = tables.tree_sequence()
-ts.first().draw(format="svg", path="foo.svg", height=5000, width=5000)
-ts = tables2.tree_sequence()
-ts.first().draw(format="svg", path="foo2.svg", height=5000, width=5000)
