@@ -125,7 +125,12 @@ def finish_initial_liftover(
         edge_offset += 1
 
 
-def add_new_edges(tables, stitched_edges, buffered_edges, time):
+def add_new_edges(
+    tables: tskit.TableCollection,
+    stitched_edges: tskit.EdgeTable,
+    buffered_edges: typing.List[BufferedEdge],
+    time: float,
+):
     for b in reversed(buffered_edges):
         if tables.nodes.time[b.parent] > time:
             for d in b.descendants:
