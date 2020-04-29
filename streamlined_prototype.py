@@ -39,7 +39,7 @@ class IndexAndNodes(object):
         return [self.node0, self.node1]
 
 
-def sort_alive_at_last_simplification(alive, tables):
+def sort_alive_at_last_simplification(alive: np.ndarray, tables: tskit.TableCollection):
     alive = sorted(alive, key=lambda x: (tables.nodes.time[x], x))
 
     return alive
@@ -192,7 +192,11 @@ def stitch_tables(
 
 
 def flush_edges_and_simplify(
-    sample_nodes, parents, alive_at_last_simplification, buffered_edges, tables
+    sample_nodes: np.ndarray,
+    parents: typing.List[IndexAndNodes],
+    alive_at_last_simplification: np.ndarray,
+    buffered_edges: typing.List[BufferedEdgeList],
+    tables: tskit.TableCollection,
 ):
     tables = stitch_tables(tables, buffered_edges, alive_at_last_simplification)
     idmap = tables.simplify(sample_nodes)
@@ -208,7 +212,7 @@ def flush_edges_and_simplify(
         p.node1 = idmap[p.node1]
 
 
-def simplify_classic(sample_nodes, tables):
+def simplify_classic(sample_nodes: np.ndarray, tables: tskit.TableCollection):
     tables.sort()
     tables.simplify(sample_nodes)
 
