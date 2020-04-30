@@ -118,19 +118,20 @@ def handle_alive_nodes_from_last_time(
 
     # Do any in alive_with_new_edges have
     # edges already in tables.edges?
-    starts = np.array([-1] * len(tables.nodes), dtype=np.int32)
-    stops = np.array([-1] * len(tables.nodes), dtype=np.int32)
+    starts = np.array([np.iinfo(np.int32).max] * len(tables.nodes), dtype=np.int32)
+    stops = np.array([np.iinfo(np.int32).max] * len(tables.nodes), dtype=np.int32)
     for i, e in enumerate(tables.edges):
-        if starts[e.parent] == -1:
+        if starts[e.parent] == np.iinfo(np.int32).max:
             starts[e.parent] = i
             stops[e.parent] = i
         else:
             stops[e.parent] = i
 
+    # FIXME: a simple iteration would do better here.
     existing_edges = [
         ExistingEdges(i, starts[i], stops[i])
         for i in alive_with_new_edges
-        if starts[i] != -1
+        if starts[i] != np.iinfo(np.int32).max
     ]
 
     if len(existing_edges) == 0:
@@ -151,35 +152,101 @@ def handle_alive_nodes_from_last_time(
         )
         return
 
-    existing_edges = sorted(existing_edges, key=lambda x: x.start)
-    stitched_edges.append_columns(
-        tables.edges.left[: existing_edges[0].start],
-        tables.edges.right[: existing_edges[0].start],
-        tables.edges.parent[: existing_edges[0].start],
-        tables.edges.child[: existing_edges[0].start],
+    print(len(existing_edges))
+    existing_edges = [
+        ExistingEdges(i, starts[i], stops[i])
+        for i in alive_with_new_edges
+        if len(buffered_edges[i].descendants) > 0
+    ]
+    print(len(existing_edges))
+    # existing_edges = sorted(existing_edges, key=lambda x: x.start)
+    existing_edges = sorted(
+        existing_edges,
+        key=lambda x: (tables.nodes.time[x.parent], x.start, x.parent)
+        # existing_edges, key=lambda x: (tables.nodes.time[x.parent], x.parent, x.start)
     )
+    # offset = min(len(tables.edges), min([i.start for i in existing_edges]))
+    # stitched_edges.append_columns(
+    #     tables.edges.left[:offset],
+    #     tables.edges.right[:offset],
+    #     tables.edges.parent[:offset],
+    #     tables.edges.child[:offset],
+    # )
+    for i in stitched_edges:
+        print(f"0: {i.parent} {tables.nodes.time[i.parent]}")
+    offset = 0
+    print(tables.edges[0])
+    # while offset < len(tables.edges):
+    #     if (
+    #         tables.edges.parent[offset] != existing_edges[0].parent
+    #         and tables.nodes.time[tables.edges.parent[offset]]
+    #         < tables.nodes.time[existing_edges[0].parent]
+    #     ):
+    #         e = tables.edges.parent[offset]
+    #         stitched_edges.append(e.left, e.right, e.parent, e.child)
+    #         offset+=1
+    #     else:
+    #         break
+    for i in tables.edges:
+        if tables.nodes.time[i.parent] < tables.nodes.time[existing_edges[0].parent]:
+            print(f"-1: {i} {tables.nodes.time[i.parent]}")
+        else:
+            break
+    print("chk", len(stitched_edges), offset)
     for i, ex in enumerate(existing_edges):
         # Add the pre-existing edges
-        for j in range(ex.start, ex.stop + 1):
-            e = tables.edges[j]
-            stitched_edges.add_row(
-                left=e.left, right=e.right, parent=e.parent, child=e.child
-            )
+        print(ex, tables.nodes.time[ex.parent])
+        if ex.start != np.iinfo(np.int32).max:
+            for j in range(ex.start, ex.stop + 1):
+                e = tables.edges[j]
+                print(f"1: adding {j} {tables.nodes.time[e.parent]}")
+                offset = j + 1
+                stitched_edges.add_row(
+                    left=e.left, right=e.right, parent=e.parent, child=e.child
+                )
         # Any new edges are more recent than anything in the edge
-        # table for this parent
+        # table for this parent, and thus have larger child id values,
+        # so they go in next
         for d in buffered_edges[ex.parent].descendants:
+            print(f"3: adding {ex.parent} {d.child} {tables.nodes.time[ex.parent]}")
             stitched_edges.add_row(
                 left=d.left, right=d.right, parent=ex.parent, child=d.child
             )
 
-        if i < len(existing_edges) - 1 and existing_edges[i + 1].start - ex.stop > 1:
-            # There are edges in b/w these two parents
-            for j in range(ex.stop + 1, existing_edges[i + 1].start):
-                e = tables.edges[j]
+        if i < len(existing_edges) - 1:
+            while (
+                offset < len(tables.edges)
+                and offset < existing_edges[i + 1].start
+                and tables.edges.parent[offset] != existing_edges[i + 1].parent
+                and tables.nodes.time[tables.edges.parent[offset]]
+                < tables.nodes.time[existing_edges[i + 1].parent]
+            ):
+                e = tables.edges[offset]
+                print(f"2: adding {offset} {tables.nodes.time[e.parent]}")
                 stitched_edges.add_row(
                     left=e.left, right=e.right, parent=e.parent, child=e.child
                 )
-    for i in range(existing_edges[-1].stop + 1, len(tables.edges)):
+                offset += 1
+
+        # if ex.start != np.iinfo(np.int32).max:
+        #     if (
+        #         i < len(existing_edges) - 1
+        #         and existing_edges[i + 1].start - ex.stop > 1
+        #     ):
+        #         # There are edges in b/w these two parents
+        #         for j in range(ex.stop + 1, existing_edges[i + 1].start):
+        #             e = tables.edges[j]
+        #             stitched_edges.add_row(
+        #                 left=e.left, right=e.right, parent=e.parent, child=e.child
+        #             )
+    print(offset, len(tables.edges))
+    final = max([i.stop for i in existing_edges if i.stop != np.iinfo(np.int32).max])
+    final = offset
+    # for i in range(existing_edges[-1].stop + 1, len(tables.edges)):
+    for i in range(final + 1, len(tables.edges)):
+        print(
+            f"4: adding {tables.edges.parent[i]}, {tables.nodes.time[tables.edges.parent[i]]}"
+        )
         stitched_edges.add_row(
             left=tables.edges.left[i],
             right=tables.edges.right[i],

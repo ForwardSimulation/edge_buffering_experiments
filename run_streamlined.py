@@ -2,7 +2,10 @@ import numpy as np
 
 import streamlined_prototype
 
-tables, tables2 = streamlined_prototype.wright_fisher(500, 1000, 0.0, 33)
+np.random.seed(666)
+# tables, tables2 = streamlined_prototype.wright_fisher(500, 1000, 0.0, 33)
+# tables, tables2 = streamlined_prototype.wright_fisher(500, 1000, 0.5, 33)
+tables, tables2 = streamlined_prototype.wright_fisher(50, 1000, 0.5, 33)
 assert np.array_equal(tables.nodes.time, tables2.nodes.time)
 ts = tables.tree_sequence()
 ts2 = tables2.tree_sequence()
