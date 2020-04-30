@@ -39,6 +39,20 @@ class IndexAndNodes(object):
         return [self.node0, self.node1]
 
 
+@attr.s()
+class ExistingEdges(object):
+    """
+    Where are the edges for this parent
+    in an edge table?
+
+    Used during stitching
+    """
+
+    parent: int = attr.ib()
+    start: int = attr.ib()
+    stop: int = attr.ib()
+
+
 def sort_alive_at_last_simplification(alive: np.ndarray, tables: tskit.TableCollection):
     """
     Sorts nodes "pastwards" in time.
@@ -61,26 +75,6 @@ def get_alive_nodes(parents: typing.List[IndexAndNodes]):
     for p in parents:
         alive_nodes.extend(p.nodes)
     return np.array(alive_nodes, dtype=np.int32)
-
-
-def add_most_ancient_edges(
-    tables: tskit.TableCollection, stitched_edges: tskit.EdgeTable, time: float
-):
-    """
-    TODO: docstring
-    """
-    edge_offset = 0
-    # FIXME: can be more efficient via a set_columns call
-    while (
-        edge_offset < len(tables.edges)
-        and tables.nodes.time[tables.edges.parent[edge_offset]] > time
-    ):
-        e = tables.edges[edge_offset]
-        stitched_edges.add_row(
-            left=e.left, right=e.right, parent=e.parent, child=e.child
-        )
-        edge_offset += 1
-    return edge_offset
 
 
 def handle_alive_nodes_from_last_time(
@@ -115,78 +109,83 @@ def handle_alive_nodes_from_last_time(
        group by index group, loosely following our previous,
        more complex, method in clean_implementation.py
     """
-    A = 0
-    # Find the first with descendants
-    while A < len(alive_at_last_simplification):
-        if len(buffered_edges[alive_at_last_simplification[A]].descendants) > 0:
-            break
-        A += 1
-    # Get the range of times spanned by these samples
-    most_recent = tables.nodes.time[alive_at_last_simplification].min()
-    most_ancient = tables.nodes.time[alive_at_last_simplification].max()
-    edge_offset = 0
-    foo = None
-    if edge_offset < len(tables.edges):
-        foo = tables.nodes.time[tables.edges.parent[edge_offset]]
-    print(most_recent, most_recent, foo)
-    while (
-        edge_offset < len(tables.edges)
-        and tables.nodes.time[tables.edges.parent[edge_offset]] > most_recent
-    ):
-        edge_offset += 1
-    # if edge_offset == len(tables.edges):
-    #     print("early out")
-    #     return edge_offset
-    print("chk", edge_offset, len(tables.edges))
 
-    while A < len(alive_at_last_simplification):
-        a = alive_at_last_simplification[A]
-        while edge_offset < len(tables.edges) and (
-            tables.edges.parent[edge_offset] == a
-            or tables.nodes.time[tables.edges.parent[edge_offset]]
-            >= tables.nodes.time[a]
-        ):
-            e = tables.edges[edge_offset]
+    alive_with_new_edges = [
+        a
+        for a in alive_at_last_simplification
+        if len(buffered_edges[a].descendants) > 0
+    ]
+
+    # Do any in alive_with_new_edges have
+    # edges already in tables.edges?
+    starts = np.array([-1] * len(tables.nodes), dtype=np.int32)
+    stops = np.array([-1] * len(tables.nodes), dtype=np.int32)
+    for i, e in enumerate(tables.edges):
+        if starts[e.parent] == -1:
+            starts[e.parent] = i
+            stops[e.parent] = i
+        else:
+            stops[e.parent] = i
+
+    existing_edges = [
+        ExistingEdges(i, starts[i], stops[i])
+        for i in alive_with_new_edges
+        if starts[i] != -1
+    ]
+
+    if len(existing_edges) == 0:
+        # Easy, so let's do less logic and get out of here
+        alive_with_new_edges = sorted(
+            alive_with_new_edges, key=lambda x: tables.nodes.time[x]
+        )
+        for a in alive_with_new_edges:
+            for d in buffered_edges[a].descendants:
+                stitched_edges.add_row(
+                    left=d.left, right=d.right, parent=a, child=d.child
+                )
+        stitched_edges.append_columns(
+            tables.edges.left,
+            tables.edges.right,
+            tables.edges.parent,
+            tables.edges.child,
+        )
+        return
+
+    existing_edges = sorted(existing_edges, key=lambda x: x.start)
+    stitched_edges.append_columns(
+        tables.edges.left[: existing_edges[0].start],
+        tables.edges.right[: existing_edges[0].start],
+        tables.edges.parent[: existing_edges[0].start],
+        tables.edges.child[: existing_edges[0].start],
+    )
+    for i, ex in enumerate(existing_edges):
+        # Add the pre-existing edges
+        for j in range(ex.start, ex.stop + 1):
+            e = tables.edges[j]
             stitched_edges.add_row(
                 left=e.left, right=e.right, parent=e.parent, child=e.child
             )
-            edge_offset -= 1
-        for birth in buffered_edges[a].descendants:
+        # Any new edges are more recent than anything in the edge
+        # table for this parent
+        for d in buffered_edges[ex.parent].descendants:
             stitched_edges.add_row(
-                left=birth.left, right=birth.right, parent=a, child=birth.child
+                left=d.left, right=d.right, parent=ex.parent, child=d.child
             )
-        A += 1
 
-    assert A == len(alive_at_last_simplification)
-
-    return edge_offset
-
-
-def finish_initial_liftover(
-    tables: tskit.TableCollection, stitched_edges: tskit.EdgeTable, edge_offset: int
-):
-    while edge_offset < len(tables.edges):
-        stitched_edges.add_row(
-            left=tables.edges.left[edge_offset],
-            right=tables.edges.right[edge_offset],
-            parent=tables.edges.parent[edge_offset],
-            child=tables.edges.child[edge_offset],
-        )
-        edge_offset += 1
-
-
-def add_new_edges(
-    tables: tskit.TableCollection,
-    stitched_edges: tskit.EdgeTable,
-    buffered_edges: typing.List[BufferedEdge],
-    time: float,
-):
-    for b in reversed(buffered_edges):
-        if tables.nodes.time[b.parent] > time:
-            for d in b.descendants:
+        if i < len(existing_edges) - 1 and existing_edges[i + 1].start - ex.stop > 1:
+            # There are edges in b/w these two parents
+            for j in range(ex.stop + 1, existing_edges[i + 1].start):
+                e = tables.edges[j]
                 stitched_edges.add_row(
-                    left=d.left, right=d.right, parent=b.parent, child=d.child
+                    left=e.left, right=e.right, parent=e.parent, child=e.child
                 )
+    for i in range(existing_edges[-1].stop + 1, len(tables.edges)):
+        stitched_edges.add_row(
+            left=tables.edges.left[i],
+            right=tables.edges.right[i],
+            parent=tables.edges.parent[i],
+            child=tables.edges.child[i],
+        )
 
 
 def stitch_tables(
@@ -220,30 +219,9 @@ def stitch_tables(
                 stitched_edges.add_row(
                     left=d.left, right=d.right, parent=b.parent, child=d.child
                 )
-    edge_offset = handle_alive_nodes_from_last_time(
+    handle_alive_nodes_from_last_time(
         tables, stitched_edges, alive_at_last_simplification, buffered_edges
     )
-    print(edge_offset, len(tables.edges), len(stitched_edges))
-    for i in range(edge_offset):
-        e = tables.edges[i]
-        stitched_edges.add_row(
-            left=e.left, right=e.right, parent=e.parent, child=e.child
-        )
-    print(edge_offset, len(tables.edges), len(stitched_edges))
-
-    # time = -1.0
-    # if len(alive_at_last_simplification) > 0:
-    #     time = tables.nodes.time[alive_at_last_simplification].max()
-    # edge_offset = add_most_ancient_edges(tables, stitched_edges, time)
-    # edge_offset = handle_alive_nodes_from_last_time(
-    #     tables,
-    #     stitched_edges,
-    #     alive_at_last_simplification,
-    #     buffered_edges,
-    #     edge_offset,
-    # )
-    # finish_initial_liftover(tables, stitched_edges, edge_offset)
-    # add_new_edges(tables, stitched_edges, buffered_edges, time)
 
     tables.edges.set_columns(
         left=stitched_edges.left,
@@ -251,6 +229,24 @@ def stitch_tables(
         parent=stitched_edges.parent,
         child=stitched_edges.child,
     )
+
+    # Do some validation
+    last_child = np.array([-1] * len(tables.nodes), dtype=np.int32)
+    for i, e in enumerate(tables.edges):
+        if last_child[e.child] != -1:
+            assert last_child[e.child] == i - 1
+            last_child[e.child] = i
+
+    E = 0
+    while E < len(tables.edges):
+        p = tables.edges.parent[E]
+        children = []
+        while E < len(tables.edges) and tables.edges.parent[E] == p:
+            children.append(tables.edges.child[E])
+            E += 1
+        assert children == sorted(
+            children
+        ), f"{children} {p in alive_at_last_simplification} {buffered_edges[p]}"
 
     return tables
 
@@ -263,6 +259,7 @@ def flush_edges_and_simplify(
     tables: tskit.TableCollection,
 ):
     tables = stitch_tables(tables, buffered_edges, alive_at_last_simplification)
+    print(f"stitched: {len(tables.nodes)} {len(tables.edges)}")
     idmap = tables.simplify(sample_nodes)
     alive_nodes = idmap[sample_nodes]
     alive_nodes = alive_nodes[np.where(alive_nodes != tskit.NULL)]
@@ -281,16 +278,19 @@ def flush_edges_and_simplify(
 
 def simplify_classic(sample_nodes: np.ndarray, tables: tskit.TableCollection):
     tables.sort()
+    print(f"classic: {len(tables.nodes)} {len(tables.edges)}")
     tables.simplify(sample_nodes)
 
 
 def pairwise_distance_branch(ts: tskit.TreeSequence, samples: np.array):
     sample_sets = []
+    indexes = []
     for i in range(len(samples)):
+        sample_sets.append([i])
         for j in range(i + 1, len(samples)):
-            sample_sets.append([samples[i], samples[j]])
+            indexes.append((i, j))
 
-    div = ts.diversity(sample_sets, mode="branch")
+    div = ts.divergence(sample_sets, indexes=indexes, mode="branch")
     return div
 
 
