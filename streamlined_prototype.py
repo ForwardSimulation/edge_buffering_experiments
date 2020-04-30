@@ -100,6 +100,20 @@ def handle_alive_nodes_from_last_time(
     The additional complication is that we are recording edges
     by birth time (past to present), but our pre-existing edges
     are ordered present to past by birth time.
+
+    Almost all the code in this function is wrong/too complex.
+
+    To make progress:
+
+    1. process alive_at_last_simplification so that we know
+       if any of these individuals have pre-existing
+       edges in tables.edges
+    2. if they do not, then we have a simple two-step stitch
+    3. if the do, then we need to get the indexs of where those
+       pre-existing edges are.
+    4. once we have those indexes, we can proceed to stitch index
+       group by index group, loosely following our previous,
+       more complex, method in clean_implementation.py
     """
     A = 0
     # Find the first with descendants
@@ -193,6 +207,9 @@ def stitch_tables(
         return tables
 
     # Get the time of the most recent node from alive_at_last_simplification
+    # FIXME: this is better done by recording the last time of simplification,
+    # passing that to here, and adding all elements whose parent times are
+    # more recent
     time = -1
     if len(alive_at_last_simplification) > 0:
         time = tables.nodes.time[alive_at_last_simplification].min()
