@@ -162,14 +162,11 @@ def handle_alive_nodes_from_last_time(
     ]
     # existing_edges = sorted(existing_edges, key=lambda x: x.start)
     existing_edges = sorted(
-        existing_edges,
-        key=lambda x: (tables.nodes.time[x.parent], x.start, x.parent)
+        existing_edges, key=lambda x: (tables.nodes.time[x.parent], x.start, x.parent)
     )
     offset = 0
-    print("chk", len(stitched_edges), offset)
     for i, ex in enumerate(existing_edges):
         # Add the pre-existing edges
-        # print(ex, tables.nodes.time[ex.parent])
         if ex.start != np.iinfo(np.int32).max:
             while offset < ex.start:
                 e = tables.edges[offset]
@@ -184,7 +181,6 @@ def handle_alive_nodes_from_last_time(
                 old_edges_added += 1
                 e = tables.edges[j]
                 assert e.parent == ex.parent
-                # print(f"1: adding {j} {tables.nodes.time[e.parent]}")
                 offset = j + 1
                 # offset += 1
                 stitched_edges.add_row(
@@ -194,7 +190,6 @@ def handle_alive_nodes_from_last_time(
         # table for this parent, and thus have larger child id values,
         # so they go in next
         for d in buffered_edges[ex.parent].descendants:
-            # print(f"3: adding {ex.parent} {d.child} {tables.nodes.time[ex.parent]}")
             num_new_births_from_old_parents += 1
             stitched_edges.add_row(
                 left=d.left, right=d.right, parent=ex.parent, child=d.child
@@ -268,6 +263,19 @@ def stitch_tables(
     )
 
     # Do some validation
+    for i, e in enumerate(tables.edges):
+        if i > 0:
+            ti = tables.nodes.time[e.parent]
+            tim1 = tables.nodes.time[tables.edges.parent[i - 1]]
+            if not tim1 <= ti:
+                with open("dump.txt", "w") as f:
+                    for j in range(i + 1):
+                        e = tables.edges[j]
+                        f.write(f"{e} {tables.nodes.time[e.parent]}\n")
+
+            assert (
+                tim1 <= ti
+            ), f"{tim1} {ti} {tables.edges.parent[i-1]} {e.parent} {tables.edges[i-1]} {tables.edges[i]}"
     last_child = np.array([-1] * len(tables.nodes), dtype=np.int32)
     for i, e in enumerate(tables.edges):
         if last_child[e.child] != -1:
