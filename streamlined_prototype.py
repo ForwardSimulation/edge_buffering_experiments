@@ -186,6 +186,18 @@ def handle_alive_nodes_from_last_time(
                 stitched_edges.add_row(
                     left=e.left, right=e.right, parent=e.parent, child=e.child
                 )
+        else:
+            while (
+                offset < len(tables.edges)
+                and tables.nodes.time[tables.edges.parent[offset]]
+                < tables.nodes.time[ex.parent]
+            ):
+                e = tables.edges[offset]
+                old_edges_added += 1
+                stitched_edges.add_row(
+                    left=e.left, right=e.right, parent=e.parent, child=e.child
+                )
+                offset += 1
         # Any new edges are more recent than anything in the edge
         # table for this parent, and thus have larger child id values,
         # so they go in next
