@@ -155,13 +155,11 @@ def handle_alive_nodes_from_last_time(
         )
         return num_new_births_from_old_parents, len(tables.edges.left)
 
-    print(len(existing_edges))
     existing_edges = [
         ExistingEdges(i, starts[i], stops[i])
         for i in alive_with_new_edges
         if len(buffered_edges[i].descendants) > 0
     ]
-    print(len(existing_edges))
     # existing_edges = sorted(existing_edges, key=lambda x: x.start)
     existing_edges = sorted(
         existing_edges,
@@ -175,10 +173,9 @@ def handle_alive_nodes_from_last_time(
     #     tables.edges.parent[:offset],
     #     tables.edges.child[:offset],
     # )
-    for i in stitched_edges:
-        print(f"0: {i.parent} {tables.nodes.time[i.parent]}")
+    # for i in stitched_edges:
+    #     print(f"0: {i.parent} {tables.nodes.time[i.parent]}")
     offset = 0
-    print(tables.edges[0])
     # while offset < len(tables.edges):
     #     if (
     #         tables.edges.parent[offset] != existing_edges[0].parent
@@ -190,21 +187,32 @@ def handle_alive_nodes_from_last_time(
     #         offset+=1
     #     else:
     #         break
-    for i in tables.edges:
-        if tables.nodes.time[i.parent] < tables.nodes.time[existing_edges[0].parent]:
-            print(f"-1: {i} {tables.nodes.time[i.parent]}")
-        else:
-            break
+    # for i in tables.edges:
+    #     if tables.nodes.time[i.parent] < tables.nodes.time[existing_edges[0].parent]:
+    #         print(f"-1: {i} {tables.nodes.time[i.parent]}")
+    #     else:
+    #         break
     print("chk", len(stitched_edges), offset)
     for i, ex in enumerate(existing_edges):
         # Add the pre-existing edges
-        print(ex, tables.nodes.time[ex.parent])
+        # print(ex, tables.nodes.time[ex.parent])
         if ex.start != np.iinfo(np.int32).max:
+            while offset < ex.start:
+                e = tables.edges[offset]
+                old_edges_added += 1
+                assert e.parent != ex.parent
+                assert tables.nodes.time[e.parent] <= tables.nodes.time[ex.parent]
+                stitched_edges.add_row(
+                    left=e.left, right=e.right, parent=e.parent, child=e.child
+                )
+                offset += 1
             for j in range(ex.start, ex.stop + 1):
                 old_edges_added += 1
                 e = tables.edges[j]
-                print(f"1: adding {j} {tables.nodes.time[e.parent]}")
+                assert e.parent == ex.parent
+                # print(f"1: adding {j} {tables.nodes.time[e.parent]}")
                 offset = j + 1
+                # offset += 1
                 stitched_edges.add_row(
                     left=e.left, right=e.right, parent=e.parent, child=e.child
                 )
@@ -212,27 +220,27 @@ def handle_alive_nodes_from_last_time(
         # table for this parent, and thus have larger child id values,
         # so they go in next
         for d in buffered_edges[ex.parent].descendants:
-            print(f"3: adding {ex.parent} {d.child} {tables.nodes.time[ex.parent]}")
+            # print(f"3: adding {ex.parent} {d.child} {tables.nodes.time[ex.parent]}")
             num_new_births_from_old_parents += 1
             stitched_edges.add_row(
                 left=d.left, right=d.right, parent=ex.parent, child=d.child
             )
 
-        if i < len(existing_edges) - 1:
-            while (
-                offset < len(tables.edges)
-                and offset < existing_edges[i + 1].start
-                and tables.edges.parent[offset] != existing_edges[i + 1].parent
-                and tables.nodes.time[tables.edges.parent[offset]]
-                < tables.nodes.time[existing_edges[i + 1].parent]
-            ):
-                old_edges_added += 1
-                e = tables.edges[offset]
-                print(f"2: adding {offset} {tables.nodes.time[e.parent]}")
-                stitched_edges.add_row(
-                    left=e.left, right=e.right, parent=e.parent, child=e.child
-                )
-                offset += 1
+        # if i < len(existing_edges) - 1:
+        #     while (
+        #         offset < len(tables.edges)
+        #         and offset < existing_edges[i + 1].start
+        #         and tables.edges.parent[offset] != existing_edges[i + 1].parent
+        #         and tables.nodes.time[tables.edges.parent[offset]]
+        #         < tables.nodes.time[existing_edges[i + 1].parent]
+        #     ):
+        #         old_edges_added += 1
+        #         e = tables.edges[offset]
+        #         print(f"2: adding {offset} {tables.nodes.time[e.parent]}")
+        #         stitched_edges.add_row(
+        #             left=e.left, right=e.right, parent=e.parent, child=e.child
+        #         )
+        #         offset += 1
 
         # if ex.start != np.iinfo(np.int32).max:
         #     if (
@@ -245,14 +253,14 @@ def handle_alive_nodes_from_last_time(
         #             stitched_edges.add_row(
         #                 left=e.left, right=e.right, parent=e.parent, child=e.child
         #             )
-    print(offset, len(tables.edges))
-    final = max([i.stop for i in existing_edges if i.stop != np.iinfo(np.int32).max])
+    print("check=", offset, len(tables.edges))
+    # final = max([i.stop for i in existing_edges if i.stop != np.iinfo(np.int32).max])
     final = offset
     # for i in range(existing_edges[-1].stop + 1, len(tables.edges)):
-    for i in range(final + 1, len(tables.edges)):
-        print(
-            f"4: adding {tables.edges.parent[i]}, {tables.nodes.time[tables.edges.parent[i]]}"
-        )
+    for i in range(final, len(tables.edges)):
+        # print(
+        #     f"4: adding {tables.edges.parent[i]}, {tables.nodes.time[tables.edges.parent[i]]}"
+        # )
         old_edges_added += 1
         stitched_edges.add_row(
             left=tables.edges.left[i],
