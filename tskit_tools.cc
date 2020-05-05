@@ -9,7 +9,8 @@ make_table_collection_ptr(double sequence_length)
                                 tsk_table_collection_free(tables);
                                 delete tables;
                             });
-    int err = tsk_table_collection_init(rv.get(), sequence_length);
+    int err = tsk_table_collection_init(rv.get(), 0);
+    rv->sequence_length = sequence_length;
     if (err != 0)
         {
             throw std::runtime_error("could not initialize tsk_table_collection");
