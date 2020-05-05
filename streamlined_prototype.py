@@ -147,7 +147,7 @@ def handle_alive_nodes_from_last_time(
         existing_edges, key=lambda x: (tables.nodes.time[x.parent], x.start, x.parent)
     )
     offset = 0
-    for i, ex in enumerate(existing_edges):
+    for ex in existing_edges:
         # Add the pre-existing edges
         while (
             offset < len(tables.edges)
