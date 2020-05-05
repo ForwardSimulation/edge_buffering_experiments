@@ -136,24 +136,6 @@ def handle_alive_nodes_from_last_time(
 
     num_new_births_from_old_parents = 0
     old_edges_added = 0
-    if len(existing_edges) == 0:
-        # Easy, so let's do less logic and get out of here
-        alive_with_new_edges = sorted(
-            alive_with_new_edges, key=lambda x: tables.nodes.time[x]
-        )
-        for a in alive_with_new_edges:
-            for d in buffered_edges[a].descendants:
-                num_new_births_from_old_parents += 1
-                stitched_edges.add_row(
-                    left=d.left, right=d.right, parent=a, child=d.child
-                )
-        stitched_edges.append_columns(
-            tables.edges.left,
-            tables.edges.right,
-            tables.edges.parent,
-            tables.edges.child,
-        )
-        return num_new_births_from_old_parents, len(tables.edges.left)
 
     existing_edges = [
         ExistingEdges(i, starts[i], stops[i])
@@ -167,6 +149,18 @@ def handle_alive_nodes_from_last_time(
     offset = 0
     for i, ex in enumerate(existing_edges):
         # Add the pre-existing edges
+        while (
+            offset < len(tables.edges)
+            and tables.nodes.time[tables.edges.parent[offset]]
+            < tables.nodes.time[ex.parent]
+        ):
+            e = tables.edges[offset]
+            old_edges_added += 1
+            stitched_edges.add_row(
+                left=e.left, right=e.right, parent=e.parent, child=e.child
+            )
+            offset += 1
+
         if ex.start != np.iinfo(np.int32).max:
             while offset < ex.start:
                 e = tables.edges[offset]
@@ -186,18 +180,6 @@ def handle_alive_nodes_from_last_time(
                 stitched_edges.add_row(
                     left=e.left, right=e.right, parent=e.parent, child=e.child
                 )
-        else:
-            while (
-                offset < len(tables.edges)
-                and tables.nodes.time[tables.edges.parent[offset]]
-                < tables.nodes.time[ex.parent]
-            ):
-                e = tables.edges[offset]
-                old_edges_added += 1
-                stitched_edges.add_row(
-                    left=e.left, right=e.right, parent=e.parent, child=e.child
-                )
-                offset += 1
         # Any new edges are more recent than anything in the edge
         # table for this parent, and thus have larger child id values,
         # so they go in next
