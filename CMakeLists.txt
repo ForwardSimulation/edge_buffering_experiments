@@ -9,7 +9,8 @@ include_directories(BEFORE ${wfbuffered_SOURCE_DIR}/tskit/c/subprojects/kastore)
 
 set(WFBUFFERED_SOURCES wfbuffered.cc
     rng.cc
-    tskit_tools.cc)
+    tskit_tools.cc
+    simulate.cc)
 
 file(GLOB TSKIT_SOURCES ${wfbuffered_SOURCE_DIR}/tskit/c/tskit/*.c)
 file(GLOB KASTORE_SOURCES ${wfbuffered_SOURCE_DIR}/tskit/c/subprojects/kastore/kastore.c)
