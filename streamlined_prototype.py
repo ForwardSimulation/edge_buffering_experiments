@@ -53,17 +53,6 @@ class ExistingEdges(object):
     stop: int = attr.ib()
 
 
-def sort_alive_at_last_simplification(alive: np.ndarray, tables: tskit.TableCollection):
-    """
-    Sorts nodes "pastwards" in time.
-    """
-    alive = np.array(
-        sorted(alive, key=lambda x: (tables.nodes.time[x], x)), dtype=alive.dtype
-    )
-
-    return alive
-
-
 def pass_on_node(parent: IndexAndNodes):
     if np.random.uniform() < 0.5:
         return parent.node0
@@ -294,7 +283,6 @@ def flush_edges_and_simplify(
     idmap = tables.simplify(sample_nodes)
     alive_nodes = idmap[sample_nodes]
     alive_nodes = alive_nodes[np.where(alive_nodes != tskit.NULL)]
-    alive_nodes = sort_alive_at_last_simplification(alive_nodes, tables)
 
     # One of Python's worst gotchas ;)
     buffered_edges[:] = [BufferedEdgeList(i) for i in range(len(tables.nodes))]
@@ -302,9 +290,7 @@ def flush_edges_and_simplify(
     for p in parents:
         p.node0 = idmap[p.node0]
         p.node1 = idmap[p.node1]
-    temp = idmap[sample_nodes]
-    temp = sort_alive_at_last_simplification(temp, tables)
-    return temp
+    return alive_nodes
 
 
 def simplify_classic(sample_nodes: np.ndarray, tables: tskit.TableCollection):
