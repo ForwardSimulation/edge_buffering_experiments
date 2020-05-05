@@ -240,12 +240,10 @@ def stitch_tables(
     # FIXME: this is better done by recording the last time of simplification,
     # passing that to here, and adding all elements whose parent times are
     # more recent
-    input_edge_table_length = len(tables.edges)
     time = -1
     if len(alive_at_last_simplification) > 0:
         time = tables.nodes.time[alive_at_last_simplification].min()
     stitched_edges = tskit.EdgeTable()
-    total_births = sum([len(i.descendants) for i in buffered_edges])
     num_new_births = 0
     for b in reversed(buffered_edges):
         if tables.nodes.time[b.parent] < time:
