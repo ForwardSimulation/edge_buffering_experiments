@@ -207,7 +207,6 @@ def handle_alive_nodes_from_last_time(
                 left=d.left, right=d.right, parent=ex.parent, child=d.child
             )
 
-    print("check=", offset, len(tables.edges))
     final = offset
     for i in range(final, len(tables.edges)):
         old_edges_added += 1
@@ -262,10 +261,6 @@ def stitch_tables(
     ) = handle_alive_nodes_from_last_time(
         tables, stitched_edges, alive_at_last_simplification, buffered_edges
     )
-    print(
-        f"Total = {num_new_births} + {num_new_births_from_old_parents} = {total_births}\n"
-        f"\t{old_edges_added} = {input_edge_table_length}"
-    )
 
     tables.edges.set_columns(
         left=stitched_edges.left,
@@ -316,7 +311,6 @@ def flush_edges_and_simplify(
     tables: tskit.TableCollection,
 ):
     tables = stitch_tables(tables, buffered_edges, alive_at_last_simplification)
-    print(f"stitched: {len(tables.nodes)} {len(tables.edges)}")
     idmap = tables.simplify(sample_nodes)
     alive_nodes = idmap[sample_nodes]
     alive_nodes = alive_nodes[np.where(alive_nodes != tskit.NULL)]
@@ -335,7 +329,6 @@ def flush_edges_and_simplify(
 
 def simplify_classic(sample_nodes: np.ndarray, tables: tskit.TableCollection):
     tables.sort()
-    print(f"classic: {len(tables.nodes)} {len(tables.edges)}")
     tables.simplify(sample_nodes)
 
 
@@ -429,7 +422,6 @@ def wright_fisher(
             assert len(tables.edges) == len(tables2.edges)
             assert np.array_equal(tables.nodes.time, tables2.nodes.time)
             simplified = True
-            print(f"done with {gen}")
         else:
             simplified = False
     if not simplified:
