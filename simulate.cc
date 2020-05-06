@@ -105,7 +105,8 @@ sort_n_simplify(std::vector<Parent>& parents, table_collection_ptr& tables)
 
 void
 simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
-         unsigned simplification_interval, table_collection_ptr& tables)
+         unsigned simplification_interval, double rho, bool buffer_new_edges,
+         table_collection_ptr& tables)
 {
     std::vector<Parent> parents;
     for (unsigned i = 0; i < N; ++i)

@@ -34,6 +34,7 @@ main(int argc, char **argv)
     auto rng = make_rng(options.seed);
     auto tables = make_table_collection_ptr(1.);
     simulate(rng, options.N, options.psurvival, options.nsteps,
-             options.simplification_interval, tables);
+             options.simplification_interval, options.rho, options.buffer_new_edges,
+             tables);
     auto ret = tsk_table_collection_dump(tables.get(), "ts.trees", 0);
 }
