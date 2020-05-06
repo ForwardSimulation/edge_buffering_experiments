@@ -40,7 +40,7 @@ record_node(double t, table_collection_ptr& tables)
     );
 }
 
-void
+static void
 deaths_and_parents(const GSLrng& rng, const std::vector<Parent>& parents,
                    double psurvival, std::vector<Birth>& births)
 {
@@ -56,7 +56,7 @@ deaths_and_parents(const GSLrng& rng, const std::vector<Parent>& parents,
         }
 }
 
-void
+static void
 generate_births(const GSLrng& rng, const std::vector<Birth>& births, double birth_time,
                 table_collection_ptr& tables)
 {
@@ -81,7 +81,7 @@ generate_births(const GSLrng& rng, const std::vector<Birth>& births, double birt
         }
 }
 
-void
+static void
 sort_n_simplify(std::vector<Parent>& parents, table_collection_ptr& tables)
 {
     int rv = tsk_table_collection_sort(tables.get(), nullptr, 0);
@@ -102,7 +102,7 @@ sort_n_simplify(std::vector<Parent>& parents, table_collection_ptr& tables)
         }
 }
 
-void
+static void
 simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
          unsigned simplification_interval, table_collection_ptr& tables)
 {
