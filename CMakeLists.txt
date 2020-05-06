@@ -4,16 +4,16 @@ project(wfbuffered)
 find_package(GSL REQUIRED)
 message(STATUS "GSL headers in ${GSL_INCLUDE_DIRS}")
 include_directories(BEFORE ${GSL_INCLUDE_DIRS})
-include_directories(BEFORE ${wfbuffered_SOURCE_DIR}/tskit/c)
-include_directories(BEFORE ${wfbuffered_SOURCE_DIR}/tskit/c/subprojects/kastore)
+include_directories(BEFORE ${wfbuffered_SOURCE_DIR}/subprojects/tskit/c)
+include_directories(BEFORE ${wfbuffered_SOURCE_DIR}/subprojects/tskit/c/subprojects/kastore)
 
 set(WFBUFFERED_SOURCES wfbuffered.cc
     rng.cc
     tskit_tools.cc
     simulate.cc)
 
-file(GLOB TSKIT_SOURCES ${wfbuffered_SOURCE_DIR}/tskit/c/tskit/*.c)
-file(GLOB KASTORE_SOURCES ${wfbuffered_SOURCE_DIR}/tskit/c/subprojects/kastore/kastore.c)
+file(GLOB TSKIT_SOURCES ${wfbuffered_SOURCE_DIR}/subprojects/tskit/c/tskit/*.c)
+file(GLOB KASTORE_SOURCES ${wfbuffered_SOURCE_DIR}/subprojects/tskit/c/subprojects/kastore/kastore.c)
 
 set(ALL_SOURCES ${WFBUFFERED_SOURCES}
     ${TSKIT_SOURCES}
