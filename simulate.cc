@@ -1,4 +1,4 @@
-#include <bits/c++config.h>
+#include <iostream>
 #include <vector>
 #include <gsl/gsl_randist.h>
 #include "rng.hpp"
@@ -58,7 +58,7 @@ deaths_and_parents(const GSLrng& rng, const std::vector<Parent>& parents,
 
 static void
 generate_births(const GSLrng& rng, const std::vector<Birth>& births, double birth_time,
-                table_collection_ptr& tables)
+                std::vector<Parent>& parents, table_collection_ptr& tables)
 {
     for (auto& b : births)
         {
@@ -78,6 +78,7 @@ generate_births(const GSLrng& rng, const std::vector<Birth>& births, double birt
                                              parental_node0, new_node_0, nullptr, 0);
             rv = tsk_edge_table_add_row(&tables->edges, 0., tables->sequence_length,
                                         parental_node1, new_node_1, nullptr, 0);
+            parents[b.index] = Parent(b.index, new_node_0, new_node_1);
         }
 }
 
@@ -90,7 +91,7 @@ sort_n_simplify(std::vector<Parent>& parents, table_collection_ptr& tables)
     for (auto& p : parents)
         {
             samples.push_back(p.node0);
-            samples.push_back(p.node0);
+            samples.push_back(p.node1);
         }
     node_map.resize(tables->nodes.num_rows);
     rv = tsk_table_collection_simplify(tables.get(), samples.data(), samples.size(), 0,
@@ -102,7 +103,7 @@ sort_n_simplify(std::vector<Parent>& parents, table_collection_ptr& tables)
         }
 }
 
-static void
+void
 simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
          unsigned simplification_interval, table_collection_ptr& tables)
 {
@@ -119,7 +120,7 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
     for (unsigned step = 1; step <= nsteps; ++step)
         {
             deaths_and_parents(rng, parents, psurvival, births);
-            generate_births(rng, births, nsteps - step, tables);
+            generate_births(rng, births, nsteps - step, parents, tables);
             if (step % simplification_interval == 0.)
                 {
                     sort_n_simplify(parents, tables);
