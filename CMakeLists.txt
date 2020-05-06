@@ -10,7 +10,9 @@ include_directories(BEFORE ${wfbuffered_SOURCE_DIR}/subprojects/tskit/c/subproje
 set(WFBUFFERED_SOURCES wfbuffered.cc
     rng.cc
     tskit_tools.cc
-    simulate.cc)
+    simulate.cc
+    options.cc
+    cli.cc)
 
 file(GLOB TSKIT_SOURCES ${wfbuffered_SOURCE_DIR}/subprojects/tskit/c/tskit/*.c)
 file(GLOB KASTORE_SOURCES ${wfbuffered_SOURCE_DIR}/subprojects/tskit/c/subprojects/kastore/kastore.c)
@@ -22,3 +24,4 @@ set(ALL_SOURCES ${WFBUFFERED_SOURCES}
 
 add_executable(wfbuffered ${ALL_SOURCES})
 target_link_libraries(wfbuffered PRIVATE GSL::gsl GSL::gslcblas)
+target_link_libraries(wfbuffered PRIVATE boost_program_options)
