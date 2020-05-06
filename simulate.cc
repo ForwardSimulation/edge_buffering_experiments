@@ -1,4 +1,6 @@
 #include <iostream>
+#include <algorithm>
+#include <tuple>
 #include <limits>
 #include <memory>
 #include <vector>
@@ -32,10 +34,43 @@ namespace
     };
 }
 
+// Helper types for edge buffering
+
+struct temp_edges
+// Used for calls to tsk_edge_table_set_columns
+// Within tskit, we'd just use an edge table.
+{
+    std::vector<double> left, right;
+    std::vector<tsk_id_t> parent, child;
+    temp_edges() : left{}, right{}, parent{}, child{}
+    {
+    }
+
+    void
+    clear()
+    {
+        left.clear();
+        right.clear();
+        parent.clear();
+        child.clear();
+    }
+};
+
+struct ExistingEdges
+{
+    tsk_id_t parent;
+    std::size_t start, stop;
+    ExistingEdges(tsk_id_t p, std::size_t start_, std::size_t stop_)
+        : parent{p}, start{start_}, stop{stop_}
+    {
+    }
+};
+
 // NOTE: the next couple of functions are duplicates of logic
 // already implemented in fwdpp::ts::ancestry_list.  In fact,
 // the entire edge buffer idea has enough overlap that we
 // should create a generic template type to reuse.
+
 std::int32_t
 get_buffer_end(const edge_buffer_ptr& new_edges, std::size_t i)
 {
@@ -77,10 +112,90 @@ buffer_new_edge(tsk_id_t parent, double left, double right, double child,
 }
 
 void
+copy_births_since_last_simplification(const edge_buffer_ptr& new_edges,
+                                      const table_collection_ptr& tables,
+                                      double last_simplification_time,
+                                      temp_edges& edge_liftover)
+{
+    // TODO: should validate data in new_edges
+    edge_liftover.clear(); // Re-use this buffer b/c it'll get big.
+
+    // Go backwards through new births, and add them
+    // to our temporary edge table if they are newer
+    // than the last simplification time
+    for (auto b = new_edges->first.rbegin();
+         b != new_edges->first.rend()
+         && tables->nodes.time[*b] < last_simplification_time;
+         ++b)
+        {
+            auto n = *b;
+            while (n != -1)
+                {
+                    edge_liftover.parent.push_back(n);
+                    edge_liftover.left.push_back(new_edges->births[n].left);
+                    edge_liftover.right.push_back(new_edges->births[n].right);
+                    edge_liftover.child.push_back(new_edges->births[n].child);
+                }
+            n = new_edges->next[n];
+        }
+}
+
+std::vector<ExistingEdges>
+find_pre_existing_edges(const table_collection_ptr& tables,
+                        const std::vector<tsk_id_t>& alive_at_last_simplification,
+                        const edge_buffer_ptr& new_edges)
+{
+    std::vector<tsk_id_t> alive_with_new_edges;
+    for (auto a : alive_at_last_simplification)
+        {
+            if (new_edges->first[a] != -1)
+                {
+                    alive_with_new_edges.push_back(a);
+                }
+        }
+    if (alive_with_new_edges.empty()) // get out early
+        {
+            return {};
+        }
+    // index where each node already has edges.
+    const auto umax = std::numeric_limits<std::size_t>::max();
+    std::vector<std::size_t> starts(tables->nodes.num_rows, umax),
+        stops(tables->nodes.num_rows, umax);
+    for (decltype(tables->edges.num_rows) i = 0; i < tables->edges.num_rows; ++i)
+        {
+            if (starts[tables->edges.parent[i]] == umax)
+                {
+                    starts[tables->edges.parent[i]] = i;
+                    stops[tables->edges.parent[i]] = i;
+                }
+        }
+
+    std::vector<ExistingEdges> existing_edges;
+    for (auto a : alive_with_new_edges)
+        {
+            existing_edges.emplace_back(a, starts[a], stops[a]);
+        }
+
+    // Our only sort!!
+    std::sort(begin(existing_edges), end(existing_edges),
+              [&tables](const ExistingEdges& lhs, const ExistingEdges& rhs) {
+                  // lexical comparison of tuple elements just like in Python
+                  return std::tie(tables->nodes.time[lhs.parent], lhs.start, lhs.stop)
+                         < std::tie(tables->nodes.time[rhs.parent], rhs.start, rhs.stop);
+              });
+
+    return existing_edges;
+}
+
+void
 stitch_together_edges(const std::vector<tsk_id_t>& alive_at_last_simplification,
                       double last_simplification_time, edge_buffer_ptr& new_edges,
-                      table_collection_ptr& tables)
+                      temp_edges& edge_liftover, table_collection_ptr& tables)
 {
+    copy_births_since_last_simplification(new_edges, tables, last_simplification_time,
+                                          edge_liftover);
+    auto existing_edges
+        = find_pre_existing_edges(tables, alive_at_last_simplification, new_edges);
 }
 
 static tsk_id_t
@@ -188,8 +303,12 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
             auto id1 = record_node(nsteps, tables);
             parents.emplace_back(i, id0, id1);
         }
+
+    // The next bits are all for buffering
     std::vector<tsk_id_t> alive_at_last_simplification;
-    double last_simplification_time = std::numeric_limits<double>::quiet_NaN();
+    temp_edges edge_liftover;
+    double last_simplification_time
+        = nsteps + 1; // NOTE: this initialization is a gotcha
 
     edge_buffer_ptr new_edges(nullptr);
     if (buffer_new_edges)
@@ -213,6 +332,12 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
                     else
                         {
                             last_simplification_time = nsteps - step;
+                            alive_at_last_simplification.clear();
+                            for (auto& p : parents)
+                                {
+                                    alive_at_last_simplification.push_back(p.node0);
+                                    alive_at_last_simplification.push_back(p.node1);
+                                }
                         }
                     simplified = true;
                 }
