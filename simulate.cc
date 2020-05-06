@@ -1,4 +1,5 @@
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <vector>
 #include <gsl/gsl_randist.h>
@@ -187,6 +188,8 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
             auto id1 = record_node(nsteps, tables);
             parents.emplace_back(i, id0, id1);
         }
+    std::vector<tsk_id_t> alive_at_last_simplification;
+    double last_simplification_time = std::numeric_limits<double>::quiet_NaN();
 
     edge_buffer_ptr new_edges(nullptr);
     if (buffer_new_edges)
@@ -203,7 +206,14 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
                             parents, tables);
             if (step % simplification_interval == 0.)
                 {
-                    sort_n_simplify(parents, tables);
+                    if (buffer_new_edges == false)
+                        {
+                            sort_n_simplify(parents, tables);
+                        }
+                    else
+                        {
+                            last_simplification_time = nsteps - step;
+                        }
                     simplified = true;
                 }
             else
@@ -213,6 +223,12 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
         }
     if (simplified == false)
         {
-            sort_n_simplify(parents, tables);
+            if (buffer_new_edges == false)
+                {
+                    sort_n_simplify(parents, tables);
+                }
+            else
+                {
+                }
         }
 }
