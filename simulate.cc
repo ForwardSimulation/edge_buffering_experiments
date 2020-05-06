@@ -85,14 +85,21 @@ void
 sort_n_simplify(std::vector<Parent>& parents, table_collection_ptr& tables)
 {
     int rv = tsk_table_collection_sort(tables.get(), nullptr, 0);
-    std::vector<tsk_id_t> samples;
+    // FIXME: these shouldn't be allocated each time
+    std::vector<tsk_id_t> samples, node_map;
     for (auto& p : parents)
         {
             samples.push_back(p.node0);
             samples.push_back(p.node0);
         }
+    node_map.resize(tables->nodes.num_rows);
     rv = tsk_table_collection_simplify(tables.get(), samples.data(), samples.size(), 0,
-                                       nullptr);
+                                       node_map.data());
+    for (auto& p : parents)
+        {
+            p.node0 = node_map[p.node0];
+            p.node1 = node_map[p.node1];
+        }
 }
 
 void
