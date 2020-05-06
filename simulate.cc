@@ -1,8 +1,12 @@
 #include <iostream>
+#include <memory>
 #include <vector>
 #include <gsl/gsl_randist.h>
 #include "rng.hpp"
 #include "tskit_tools.hpp"
+#include "edge_buffer.hpp"
+
+using edge_buffer_ptr = std::unique_ptr<EdgeBuffer>;
 
 namespace
 {
@@ -25,6 +29,57 @@ namespace
         {
         }
     };
+}
+
+// NOTE: the next couple of functions are duplicates of logic
+// already implemented in fwdpp::ts::ancestry_list.  In fact,
+// the entire edge buffer idea has enough overlap that we
+// should create a generic template type to reuse.
+std::int32_t
+get_buffer_end(const edge_buffer_ptr& new_edges, std::size_t i)
+{
+    auto f = new_edges->first[i];
+    while (f != -1 && new_edges->next[f] != -1)
+        {
+            f = new_edges->next[f];
+        }
+    return f;
+}
+
+void
+buffer_new_edge(tsk_id_t parent, double left, double right, double child,
+                edge_buffer_ptr& new_edges)
+{
+    if (parent == TSK_NULL || child == TSK_NULL)
+        {
+            throw std::runtime_error("bad node IDs passed to buffer_new_edge");
+        }
+    if (parent >= new_edges->first.size())
+        {
+            new_edges->first.resize(parent, -1);
+        }
+    if (new_edges->first[parent] == -1)
+        {
+            new_edges->births.emplace_back(left, right, child);
+            new_edges->first[parent] = new_edges->births.size() - 1;
+            if (new_edges->births.size() >= new_edges->next.size())
+                {
+                    new_edges->next.push_back(-1);
+                }
+        }
+    else
+        {
+            new_edges->next.push_back(-1);
+            auto l = get_buffer_end(new_edges, parent);
+            new_edges->next[l] = -1;
+        }
+}
+
+void
+stitch_together_edges(const std::vector<tsk_id_t>& alive_at_last_simplification,
+                      double last_simplification_time, edge_buffer_ptr& new_edges,
+                      table_collection_ptr& tables)
+{
 }
 
 static tsk_id_t
@@ -58,6 +113,7 @@ deaths_and_parents(const GSLrng& rng, const std::vector<Parent>& parents,
 
 static void
 generate_births(const GSLrng& rng, const std::vector<Birth>& births, double birth_time,
+                bool buffer_new_edges, edge_buffer_ptr& new_edges,
                 std::vector<Parent>& parents, table_collection_ptr& tables)
 {
     for (auto& b : births)
@@ -74,10 +130,22 @@ generate_births(const GSLrng& rng, const std::vector<Birth>& births, double birt
                 {
                     parental_node1 = b.p1node1;
                 }
-            auto rv = tsk_edge_table_add_row(&tables->edges, 0., tables->sequence_length,
-                                             parental_node0, new_node_0, nullptr, 0);
-            rv = tsk_edge_table_add_row(&tables->edges, 0., tables->sequence_length,
-                                        parental_node1, new_node_1, nullptr, 0);
+            if (buffer_new_edges == false)
+                {
+                    auto rv = tsk_edge_table_add_row(
+                        &tables->edges, 0., tables->sequence_length, parental_node0,
+                        new_node_0, nullptr, 0);
+                    rv = tsk_edge_table_add_row(&tables->edges, 0.,
+                                                tables->sequence_length, parental_node1,
+                                                new_node_1, nullptr, 0);
+                }
+            else
+                {
+                    buffer_new_edge(parental_node0, 0., tables->sequence_length,
+                                    new_node_0, new_edges);
+                    buffer_new_edge(parental_node1, 0., tables->sequence_length,
+                                    new_node_1, new_edges);
+                }
             parents[b.index] = Parent(b.index, new_node_0, new_node_1);
         }
 }
@@ -108,6 +176,10 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
          unsigned simplification_interval, double rho, bool buffer_new_edges,
          table_collection_ptr& tables)
 {
+    if (rho > 0.)
+        {
+            throw std::invalid_argument("recombination not implemented yet");
+        }
     std::vector<Parent> parents;
     for (unsigned i = 0; i < N; ++i)
         {
@@ -116,12 +188,19 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
             parents.emplace_back(i, id0, id1);
         }
 
+    edge_buffer_ptr new_edges(nullptr);
+    if (buffer_new_edges)
+        {
+            new_edges.reset(new EdgeBuffer(tables->nodes.num_rows));
+        }
+
     std::vector<Birth> births;
     bool simplified = false;
     for (unsigned step = 1; step <= nsteps; ++step)
         {
             deaths_and_parents(rng, parents, psurvival, births);
-            generate_births(rng, births, nsteps - step, parents, tables);
+            generate_births(rng, births, nsteps - step, buffer_new_edges, new_edges,
+                            parents, tables);
             if (step % simplification_interval == 0.)
                 {
                     sort_n_simplify(parents, tables);

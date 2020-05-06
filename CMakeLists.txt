@@ -12,7 +12,8 @@ set(WFBUFFERED_SOURCES wfbuffered.cc
     tskit_tools.cc
     simulate.cc
     options.cc
-    cli.cc)
+    cli.cc
+    edge_buffer.cc)
 
 file(GLOB TSKIT_SOURCES ${wfbuffered_SOURCE_DIR}/subprojects/tskit/c/tskit/*.c)
 file(GLOB KASTORE_SOURCES ${wfbuffered_SOURCE_DIR}/subprojects/tskit/c/subprojects/kastore/kastore.c)
