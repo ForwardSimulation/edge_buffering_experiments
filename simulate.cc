@@ -138,6 +138,14 @@ buffer_new_edge(tsk_id_t parent, double left, double right, double child,
                 {
                     new_edges->next.push_back(-1);
                 }
+            if (new_edges->next[parent] != -1)
+                {
+                    std::ostringstream o;
+                    o << "invalid next entry for first birth: " << parent << ' '
+                      << new_edges->first[parent] << ' ' << new_edges->next[parent]
+                      << ' ' << new_edges->first.size() << ' ' << new_edges->next.size();
+                    throw std::runtime_error(o.str());
+                }
         }
     else
         {
@@ -159,18 +167,30 @@ copy_births_since_last_simplification(const edge_buffer_ptr& new_edges,
     // Go backwards through new births, and add them
     // to our temporary edge table if they are newer
     // than the last simplification time
-    for (auto b = new_edges->first.rbegin();
-         b != new_edges->first.rend()
-         && tables->nodes.time[*b] < last_simplification_time;
-         ++b)
+
+    for (decltype(tables->nodes.num_rows) i = 0; i < tables->nodes.num_rows; ++i)
         {
-            auto n = *b;
-            while (n != -1)
+            decltype(i) j = tables->nodes.num_rows - i - 1;
+            auto tp = tables->nodes.time[j];
+            if (tp < last_simplification_time)
                 {
-                    edge_liftover.add_edge(new_edges->births[n].left,
-                                           new_edges->births[n].right, n,
-                                           new_edges->births[n].child);
-                    n = new_edges->next[n];
+                    auto n = new_edges->first[j];
+                    while (n != -1)
+                        {
+                            auto tc = tables->nodes.time[new_edges->births[n].child];
+                            std::cout << i << ' ' << j << ' ' << last_simplification_time
+                                      << ' ' << tp << ' ' << tc << std::endl;
+                            if (tc >= tp)
+                                {
+                                    std::ostringstream o;
+                                    o << "bad parent/child times: " << tp << ' ' << tc;
+                                    throw std::runtime_error(o.str());
+                                }
+                            edge_liftover.add_edge(new_edges->births[n].left,
+                                                   new_edges->births[n].right, j,
+                                                   new_edges->births[n].child);
+                            n = new_edges->next[n];
+                        }
                 }
         }
 }
@@ -296,6 +316,8 @@ stitch_together_edges(const std::vector<tsk_id_t>& alive_at_last_simplification,
         = find_pre_existing_edges(tables, alive_at_last_simplification, new_edges);
     auto offset
         = handle_pre_existing_edges(tables, new_edges, existing_edges, edge_liftover);
+    std::cout << last_simplification_time << ' ' << edge_liftover.size() << ' ' << offset
+              << std::endl;
     for (; offset < tables->edges.num_rows; ++offset)
         {
             edge_liftover.add_edge(
@@ -313,10 +335,10 @@ stitch_together_edges(const std::vector<tsk_id_t>& alive_at_last_simplification,
 static void
 handle_tskit_return_code(int code)
 {
-    std::ostringstream o;
-    o << tsk_strerror(code);
     if (code != 0)
         {
+            std::ostringstream o;
+            o << tsk_strerror(code);
             throw std::runtime_error(o.str());
         }
 }
