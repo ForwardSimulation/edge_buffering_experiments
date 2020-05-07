@@ -2,7 +2,8 @@
 #include <stdexcept>
 #include "edge_buffer.hpp"
 
-BirthData::BirthData(double l, double r, tsk_id_t c) : left{l}, right{r}, child{c}
+BirthData::BirthData(double l, double r, tsk_id_t c)
+    : left{l}, right{r}, child{c}, next{-1}
 {
     if (r <= l)
         {
@@ -10,7 +11,6 @@ BirthData::BirthData(double l, double r, tsk_id_t c) : left{l}, right{r}, child{
         }
 }
 
-EdgeBuffer::EdgeBuffer(std::size_t num_nodes)
-    : first(num_nodes, -1), next(num_nodes, -1), births{}
+EdgeBuffer::EdgeBuffer(std::size_t num_nodes) : first(num_nodes, -1), births{}
 {
 }
