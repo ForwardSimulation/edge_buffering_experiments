@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 #include <algorithm>
 #include <tuple>
 #include <limits>
@@ -59,6 +60,12 @@ struct temp_edges
     void
     add_edge(double l, double r, tsk_id_t p, tsk_id_t c)
     {
+        if (r <= l)
+            {
+                std::ostringstream o;
+                o << "bad left/right " << l << ' ' << r;
+                throw std::invalid_argument(o.str());
+            }
         left.push_back(l);
         right.push_back(r);
         parent.push_back(p);
@@ -95,10 +102,18 @@ struct ExistingEdges
 std::int32_t
 get_buffer_end(const edge_buffer_ptr& new_edges, std::size_t i)
 {
+    if (i >= new_edges->first.size())
+        {
+            throw std::runtime_error("invalid parent index");
+        }
     auto f = new_edges->first[i];
     while (f != -1 && new_edges->next[f] != -1)
         {
             f = new_edges->next[f];
+            if (f != -1 && f >= new_edges->next.size())
+                {
+                    throw std::runtime_error("invalid next value");
+                }
         }
     return f;
 }
@@ -113,11 +128,11 @@ buffer_new_edge(tsk_id_t parent, double left, double right, double child,
         }
     if (parent >= new_edges->first.size())
         {
-            new_edges->first.resize(parent, -1);
+            new_edges->first.resize(parent + 1, -1);
         }
+    new_edges->births.emplace_back(left, right, child);
     if (new_edges->first[parent] == -1)
         {
-            new_edges->births.emplace_back(left, right, child);
             new_edges->first[parent] = new_edges->births.size() - 1;
             if (new_edges->births.size() >= new_edges->next.size())
                 {
@@ -128,7 +143,7 @@ buffer_new_edge(tsk_id_t parent, double left, double right, double child,
         {
             new_edges->next.push_back(-1);
             auto l = get_buffer_end(new_edges, parent);
-            new_edges->next[l] = -1;
+            new_edges->next[l] = new_edges->births.size() - 1;
         }
 }
 
@@ -152,11 +167,11 @@ copy_births_since_last_simplification(const edge_buffer_ptr& new_edges,
             auto n = *b;
             while (n != -1)
                 {
-                    edge_liftover.add_edge(n, new_edges->births[n].left,
-                                           new_edges->births[n].right,
+                    edge_liftover.add_edge(new_edges->births[n].left,
+                                           new_edges->births[n].right, n,
                                            new_edges->births[n].child);
+                    n = new_edges->next[n];
                 }
-            n = new_edges->next[n];
         }
 }
 
@@ -202,6 +217,16 @@ find_pre_existing_edges(const table_collection_ptr& tables,
                   return std::tie(tables->nodes.time[lhs.parent], lhs.start, lhs.stop)
                          < std::tie(tables->nodes.time[rhs.parent], rhs.start, rhs.stop);
               });
+    for (std::size_t i = 1; i < existing_edges.size(); ++i)
+        {
+            auto t0 = tables->nodes.time[existing_edges[i - 1].parent];
+            auto t1 = tables->nodes.time[existing_edges[i].parent];
+            if (t0 > t1)
+                {
+                    throw std::runtime_error(
+                        "existing edges not properly sorted by time");
+                }
+        }
 
     return existing_edges;
 }
@@ -286,11 +311,13 @@ stitch_together_edges(const std::vector<tsk_id_t>& alive_at_last_simplification,
 }
 
 static void
-handle_tskit_return_code(int code, std::string message)
+handle_tskit_return_code(int code)
 {
+    std::ostringstream o;
+    o << tsk_strerror(code);
     if (code != 0)
         {
-            throw std::runtime_error(std::move(message));
+            throw std::runtime_error(o.str());
         }
 }
 
@@ -368,10 +395,20 @@ sort_n_simplify(std::vector<tsk_id_t>& samples, std::vector<tsk_id_t>& node_map,
                 table_collection_ptr& tables)
 {
     int rv = tsk_table_collection_sort(tables.get(), nullptr, 0);
-    handle_tskit_return_code(rv, "error in table sorting from sort_n_simplify");
+    handle_tskit_return_code(rv);
     rv = tsk_table_collection_simplify(tables.get(), samples.data(), samples.size(), 0,
                                        node_map.data());
-    handle_tskit_return_code(rv, "error in table simplification from sort_n_simplify");
+    handle_tskit_return_code(rv);
+}
+
+static void
+validate_stitched_tables(const table_collection_ptr& tables)
+// Relatively expensive checks
+{
+    int rv = tsk_table_collection_check_integrity(tables.get(), TSK_CHECK_EDGE_ORDERING);
+    handle_tskit_return_code(rv);
+    rv = tsk_table_collection_check_integrity(tables.get(), TSK_CHECK_OFFSETS);
+    handle_tskit_return_code(rv);
 }
 
 static void
@@ -383,10 +420,16 @@ flush_buffer_n_simplify(double last_simplification_time,
 {
     stitch_together_edges(alive_at_last_simplification, last_simplification_time,
                           new_edges, edge_liftover, tables);
+    validate_stitched_tables(tables);
     int rv = tsk_table_collection_simplify(tables.get(), samples.data(), samples.size(),
                                            0, node_map.data());
-    handle_tskit_return_code(rv,
-                             "error in table simplification flush_buffer_n_simplify");
+    handle_tskit_return_code(rv);
+    // TODO: move this cleanup to function
+    new_edges->first.resize(tables->nodes.num_rows);
+    new_edges->next.resize(tables->nodes.num_rows);
+    std::fill(begin(new_edges->first), end(new_edges->first), -1);
+    std::fill(begin(new_edges->next), end(new_edges->next), -1);
+    new_edges->births.clear();
 }
 
 void
