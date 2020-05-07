@@ -10,6 +10,7 @@
 #include "edge_buffer.hpp"
 
 using edge_buffer_ptr = std::unique_ptr<EdgeBuffer>;
+const auto UMAX = std::numeric_limits<std::size_t>::max();
 
 namespace
 {
@@ -53,6 +54,26 @@ struct temp_edges
         right.clear();
         parent.clear();
         child.clear();
+    }
+
+    void
+    add_edge(double l, double r, tsk_id_t p, tsk_id_t c)
+    {
+        left.push_back(l);
+        right.push_back(r);
+        parent.push_back(p);
+        child.push_back(c);
+    }
+
+    std::size_t
+    size() const
+    {
+        if (left.size() != right.size() || left.size() != parent.size()
+            || left.size() != child.size())
+            {
+                throw std::runtime_error("invalid size of temporary edges");
+            }
+        return left.size();
     }
 };
 
@@ -131,10 +152,9 @@ copy_births_since_last_simplification(const edge_buffer_ptr& new_edges,
             auto n = *b;
             while (n != -1)
                 {
-                    edge_liftover.parent.push_back(n);
-                    edge_liftover.left.push_back(new_edges->births[n].left);
-                    edge_liftover.right.push_back(new_edges->births[n].right);
-                    edge_liftover.child.push_back(new_edges->births[n].child);
+                    edge_liftover.add_edge(n, new_edges->births[n].left,
+                                           new_edges->births[n].right,
+                                           new_edges->births[n].child);
                 }
             n = new_edges->next[n];
         }
@@ -158,12 +178,11 @@ find_pre_existing_edges(const table_collection_ptr& tables,
             return {};
         }
     // index where each node already has edges.
-    const auto umax = std::numeric_limits<std::size_t>::max();
-    std::vector<std::size_t> starts(tables->nodes.num_rows, umax),
-        stops(tables->nodes.num_rows, umax);
+    std::vector<std::size_t> starts(tables->nodes.num_rows, UMAX),
+        stops(tables->nodes.num_rows, UMAX);
     for (decltype(tables->edges.num_rows) i = 0; i < tables->edges.num_rows; ++i)
         {
-            if (starts[tables->edges.parent[i]] == umax)
+            if (starts[tables->edges.parent[i]] == UMAX)
                 {
                     starts[tables->edges.parent[i]] = i;
                     stops[tables->edges.parent[i]] = i;
@@ -187,6 +206,60 @@ find_pre_existing_edges(const table_collection_ptr& tables,
     return existing_edges;
 }
 
+auto
+handle_pre_existing_edges(const table_collection_ptr& tables,
+                          const edge_buffer_ptr& new_edges,
+                          const std::vector<ExistingEdges>& existing_edges,
+                          temp_edges& edge_liftover) -> decltype(tables->edges.num_rows)
+{
+    decltype(tables->edges.num_rows) offset = 0;
+    for (const auto& ex : existing_edges)
+        {
+            // FIXME: this while loop is repeated 2x just w/different
+            // ranges
+            while (offset < tables->edges.num_rows
+                   && tables->nodes.time[tables->edges.parent[offset]]
+                          < tables->nodes.time[ex.parent])
+                {
+                    edge_liftover.add_edge(
+                        tables->edges.left[offset], tables->edges.right[offset],
+                        tables->edges.parent[offset], tables->edges.child[offset]);
+                    ++offset;
+                }
+            if (ex.start != UMAX)
+                {
+                    while (offset < ex.start
+                           && tables->nodes.time[tables->edges.parent[offset]]
+                                  < tables->nodes.time[ex.parent])
+                        {
+                            edge_liftover.add_edge(tables->edges.left[offset],
+                                                   tables->edges.right[offset],
+                                                   tables->edges.parent[offset],
+                                                   tables->edges.child[offset]);
+                            ++offset;
+                        }
+                    for (decltype(ex.start) i = ex.start; i < ex.stop + 1; ++i)
+                        {
+                            edge_liftover.add_edge(tables->edges.left[offset],
+                                                   tables->edges.right[offset],
+                                                   tables->edges.parent[offset],
+                                                   tables->edges.child[offset]);
+                        }
+                    // NOTE: differs from python, so could be a source of error
+                    offset = ex.stop;
+                }
+            auto n = new_edges->first[ex.parent];
+            while (n != -1)
+                {
+                    edge_liftover.add_edge(new_edges->births[n].left,
+                                           new_edges->births[n].right, ex.parent,
+                                           new_edges->births[n].child);
+                    n = new_edges->next[n];
+                }
+        }
+    return offset;
+}
+
 void
 stitch_together_edges(const std::vector<tsk_id_t>& alive_at_last_simplification,
                       double last_simplification_time, edge_buffer_ptr& new_edges,
@@ -196,6 +269,29 @@ stitch_together_edges(const std::vector<tsk_id_t>& alive_at_last_simplification,
                                           edge_liftover);
     auto existing_edges
         = find_pre_existing_edges(tables, alive_at_last_simplification, new_edges);
+    auto offset
+        = handle_pre_existing_edges(tables, new_edges, existing_edges, edge_liftover);
+    for (; offset < tables->edges.num_rows; ++offset)
+        {
+            edge_liftover.add_edge(
+                tables->edges.left[offset], tables->edges.right[offset],
+                tables->edges.parent[offset], tables->edges.child[offset]);
+        }
+    int ret = tsk_edge_table_set_columns(
+        &tables->edges, edge_liftover.size(), edge_liftover.left.data(),
+        edge_liftover.right.data(), edge_liftover.parent.data(),
+        edge_liftover.child.data(), nullptr, 0);
+    // This resets sizes to 0, but keeps the memory allocated.
+    edge_liftover.clear();
+}
+
+static void
+handle_tskit_return_code(int code, std::string message)
+{
+    if (code != 0)
+        {
+            throw std::runtime_error(std::move(message));
+        }
 }
 
 static tsk_id_t
@@ -266,25 +362,31 @@ generate_births(const GSLrng& rng, const std::vector<Birth>& births, double birt
         }
 }
 
+// NOTE: seems like samples could/should be const?
 static void
-sort_n_simplify(std::vector<Parent>& parents, table_collection_ptr& tables)
+sort_n_simplify(std::vector<tsk_id_t>& samples, std::vector<tsk_id_t>& node_map,
+                table_collection_ptr& tables)
 {
     int rv = tsk_table_collection_sort(tables.get(), nullptr, 0);
-    // FIXME: these shouldn't be allocated each time
-    std::vector<tsk_id_t> samples, node_map;
-    for (auto& p : parents)
-        {
-            samples.push_back(p.node0);
-            samples.push_back(p.node1);
-        }
-    node_map.resize(tables->nodes.num_rows);
+    handle_tskit_return_code(rv, "error in table sorting from sort_n_simplify");
     rv = tsk_table_collection_simplify(tables.get(), samples.data(), samples.size(), 0,
                                        node_map.data());
-    for (auto& p : parents)
-        {
-            p.node0 = node_map[p.node0];
-            p.node1 = node_map[p.node1];
-        }
+    handle_tskit_return_code(rv, "error in table simplification from sort_n_simplify");
+}
+
+static void
+flush_buffer_n_simplify(double last_simplification_time,
+                        std::vector<tsk_id_t>& alive_at_last_simplification,
+                        std::vector<tsk_id_t>& samples, std::vector<tsk_id_t>& node_map,
+                        edge_buffer_ptr& new_edges, temp_edges& edge_liftover,
+                        table_collection_ptr& tables)
+{
+    stitch_together_edges(alive_at_last_simplification, last_simplification_time,
+                          new_edges, edge_liftover, tables);
+    int rv = tsk_table_collection_simplify(tables.get(), samples.data(), samples.size(),
+                                           0, node_map.data());
+    handle_tskit_return_code(rv,
+                             "error in table simplification flush_buffer_n_simplify");
 }
 
 void
@@ -317,6 +419,7 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
         }
 
     std::vector<Birth> births;
+    std::vector<tsk_id_t> samples, node_map;
     bool simplified = false;
     for (unsigned step = 1; step <= nsteps; ++step)
         {
@@ -325,12 +428,23 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
                             parents, tables);
             if (step % simplification_interval == 0.)
                 {
+                    samples.clear();
+                    for (auto& p : parents)
+                        {
+                            samples.push_back(p.node0);
+                            samples.push_back(p.node1);
+                        }
+                    node_map.resize(tables->nodes.num_rows);
+
                     if (buffer_new_edges == false)
                         {
-                            sort_n_simplify(parents, tables);
+                            sort_n_simplify(samples, node_map, tables);
                         }
                     else
                         {
+                            flush_buffer_n_simplify(
+                                last_simplification_time, alive_at_last_simplification,
+                                samples, node_map, new_edges, edge_liftover, tables);
                             last_simplification_time = nsteps - step;
                             alive_at_last_simplification.clear();
                             for (auto& p : parents)
@@ -340,6 +454,12 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
                                 }
                         }
                     simplified = true;
+                    //remap parent nodes
+                    for (auto& p : parents)
+                        {
+                            p.node0 = node_map[p.node0];
+                            p.node1 = node_map[p.node1];
+                        }
                 }
             else
                 {
@@ -348,12 +468,22 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
         }
     if (simplified == false)
         {
+            samples.clear();
+            for (auto& p : parents)
+                {
+                    samples.push_back(p.node0);
+                    samples.push_back(p.node1);
+                }
+            node_map.resize(tables->nodes.num_rows);
             if (buffer_new_edges == false)
                 {
-                    sort_n_simplify(parents, tables);
+                    sort_n_simplify(samples, node_map, tables);
                 }
             else
                 {
+                    flush_buffer_n_simplify(last_simplification_time,
+                                            alive_at_last_simplification, samples,
+                                            node_map, new_edges, edge_liftover, tables);
                 }
         }
 }

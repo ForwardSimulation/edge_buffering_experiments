@@ -1,5 +1,6 @@
 #include "cli.hpp"
 #include "options.hpp"
+#include <boost/program_options/value_semantic.hpp>
 
 namespace po = boost::program_options;
 
@@ -29,7 +30,7 @@ generate_main_options(command_line_options &o)
         "Ouput file name.  Default = treefile.trees");
     options.add_options()(
         "buffer",
-        po::value<decltype(command_line_options::buffer_new_edges)>(&o.buffer_new_edges),
+        po::bool_switch(&o.buffer_new_edges),
         "If true, use edge buffering algorithm. If not, sort and simplify. Default = "
         "false");
     options.add_options()(
