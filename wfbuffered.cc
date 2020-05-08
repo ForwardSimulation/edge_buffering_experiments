@@ -36,5 +36,6 @@ main(int argc, char **argv)
     simulate(rng, options.N, options.psurvival, options.nsteps,
              options.simplification_interval, options.rho, options.buffer_new_edges,
              tables);
-    auto ret = tsk_table_collection_dump(tables.get(), "ts.trees", 0);
+    auto ret = tsk_table_collection_build_index(tables.get(), 0);
+    ret = tsk_table_collection_dump(tables.get(), options.treefile.c_str(), 0);
 }
