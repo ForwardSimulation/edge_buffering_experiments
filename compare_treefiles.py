@@ -1,7 +1,6 @@
 import sys
 
 import numpy as np
-
 import tskit
 
 
@@ -29,8 +28,12 @@ ts1 = tskit.load(treefile1)
 #     print(fn)
 #     ts0.first().draw(path=fn, height=5000,width=5000,format="svg")
 
-assert len(ts0.tables.nodes) == len(ts1.tables.nodes)
-assert len(ts0.tables.edges) == len(ts1.tables.edges)
+assert len(ts0.tables.nodes) == len(
+    ts1.tables.nodes
+), f"{len(ts0.tables.nodes)} {len(ts1.tables.nodes)}"
+assert len(ts0.tables.edges) == len(
+    ts1.tables.edges
+), f"{len(ts0.tables.edges)} {len(ts1.tables.edges)}"
 
 print(
     f"Comparing node times: {np.array_equal(ts0.tables.nodes.time, ts1.tables.nodes.time)}"
