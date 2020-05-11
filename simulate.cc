@@ -172,16 +172,6 @@ sort_n_simplify(double last_time_simplified, std::vector<tsk_id_t>& samples,
 }
 
 static void
-validate_stitched_tables(const table_collection_ptr& tables)
-// Relatively expensive checks
-{
-    int rv = tsk_table_collection_check_integrity(tables.get(), TSK_CHECK_EDGE_ORDERING);
-    handle_tskit_return_code(rv);
-    rv = tsk_table_collection_check_integrity(tables.get(), TSK_CHECK_OFFSETS);
-    handle_tskit_return_code(rv);
-}
-
-static void
 flush_buffer_n_simplify(std::vector<tsk_id_t>& alive_at_last_simplification,
                         std::vector<tsk_id_t>& samples, std::vector<tsk_id_t>& node_map,
                         edge_buffer_ptr& new_edges, temp_edges& edge_liftover,
@@ -195,7 +185,6 @@ flush_buffer_n_simplify(std::vector<tsk_id_t>& alive_at_last_simplification,
 
     stitch_together_edges(alive_at_last_simplification, max_time, new_edges,
                           edge_liftover, tables);
-    validate_stitched_tables(tables);
     int rv = tsk_table_collection_simplify(tables.get(), samples.data(), samples.size(),
                                            0, node_map.data());
     handle_tskit_return_code(rv);
