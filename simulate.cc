@@ -236,6 +236,10 @@ find_pre_existing_edges(const table_collection_ptr& tables,
                     starts[tables->edges.parent[i]] = i;
                     stops[tables->edges.parent[i]] = i;
                 }
+            else
+                {
+                    stops[tables->edges.parent[i]] = i;
+                }
         }
 
     std::vector<ExistingEdges> existing_edges;
@@ -248,8 +252,9 @@ find_pre_existing_edges(const table_collection_ptr& tables,
     std::sort(begin(existing_edges), end(existing_edges),
               [&tables](const ExistingEdges& lhs, const ExistingEdges& rhs) {
                   // lexical comparison of tuple elements just like in Python
-                  return std::tie(tables->nodes.time[lhs.parent], lhs.start, lhs.stop)
-                         < std::tie(tables->nodes.time[rhs.parent], rhs.start, rhs.stop);
+                  return std::tie(tables->nodes.time[lhs.parent], lhs.start, lhs.parent)
+                         < std::tie(tables->nodes.time[rhs.parent], rhs.start,
+                                    rhs.parent);
               });
     for (std::size_t i = 1; i < existing_edges.size(); ++i)
         {
@@ -299,13 +304,12 @@ handle_pre_existing_edges(const table_collection_ptr& tables,
                         }
                     for (decltype(ex.start) i = ex.start; i < ex.stop + 1; ++i)
                         {
-                            edge_liftover.add_edge(tables->edges.left[offset],
-                                                   tables->edges.right[offset],
-                                                   tables->edges.parent[offset],
-                                                   tables->edges.child[offset]);
+                            edge_liftover.add_edge(
+                                tables->edges.left[i], tables->edges.right[i],
+                                tables->edges.parent[i], tables->edges.child[i]);
                         }
                     // NOTE: differs from python, so could be a source of error
-                    offset = ex.stop;
+                    offset = ex.stop + 1;
                 }
             auto n = new_edges->first[ex.parent];
             while (n != -1)
@@ -515,9 +519,7 @@ flush_buffer_n_simplify(std::vector<tsk_id_t>& alive_at_last_simplification,
     handle_tskit_return_code(rv);
     // TODO: move this cleanup to function
     new_edges->first.resize(tables->nodes.num_rows);
-    //new_edges->next.resize(tables->nodes.num_rows);
     std::fill(begin(new_edges->first), end(new_edges->first), -1);
-    //std::fill(begin(new_edges->next), end(new_edges->next), -1);
     new_edges->births.clear();
 }
 
@@ -563,6 +565,7 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
                             parents, tables);
             if (step % simplification_interval == 0.)
                 {
+                    std::cout << step << '\n';
                     samples.clear();
                     for (auto& p : parents)
                         {
