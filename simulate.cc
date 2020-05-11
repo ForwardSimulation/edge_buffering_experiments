@@ -565,7 +565,6 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
                             parents, tables);
             if (step % simplification_interval == 0.)
                 {
-                    std::cout << step << '\n';
                     samples.clear();
                     for (auto& p : parents)
                         {
