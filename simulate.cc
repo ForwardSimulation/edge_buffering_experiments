@@ -294,7 +294,7 @@ handle_pre_existing_edges(const table_collection_ptr& tables,
                 {
                     while (offset < ex.start
                            && tables->nodes.time[tables->edges.parent[offset]]
-                                  < tables->nodes.time[ex.parent])
+                                  <= tables->nodes.time[ex.parent])
                         {
                             edge_liftover.add_edge(tables->edges.left[offset],
                                                    tables->edges.right[offset],
