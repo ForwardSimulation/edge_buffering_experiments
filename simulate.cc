@@ -199,10 +199,6 @@ flush_buffer_n_simplify(std::vector<tsk_id_t>& alive_at_last_simplification,
     int rv = tsk_table_collection_simplify(tables.get(), samples.data(), samples.size(),
                                            0, node_map.data());
     handle_tskit_return_code(rv);
-    // TODO: move this cleanup to function
-    new_edges->first.resize(tables->nodes.num_rows);
-    std::fill(begin(new_edges->first), end(new_edges->first), -1);
-    new_edges->births.clear();
 }
 
 void
