@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstring>
 #include <sstream>
 #include <algorithm>
 #include <tuple>
@@ -441,11 +442,44 @@ generate_births(const GSLrng& rng, const std::vector<Birth>& births, double birt
 
 // NOTE: seems like samples could/should be const?
 static void
-sort_n_simplify(std::vector<tsk_id_t>& samples, std::vector<tsk_id_t>& node_map,
-                table_collection_ptr& tables)
+sort_n_simplify(double last_time_simplified, std::vector<tsk_id_t>& samples,
+                std::vector<tsk_id_t>& node_map, table_collection_ptr& tables)
 {
+    //tsk_bookmark_t bookmark;
+    //std::memset(&bookmark, 0, sizeof(bookmark));
+    //tsk_id_t parent_to_sort = TSK_NULL, last_parent = TSK_NULL;
+    //std::size_t last_parent_index = std::numeric_limits<std::size_t>::max();
+    //for (std::size_t i = 0; i < tables->edges.num_rows && parent_to_sort == TSK_NULL;
+    //     ++i)
+    //    {
+    //        if (tables->edges.parent[i] != last_parent)
+    //            {
+    //                last_parent = tables->edges.parent[i];
+    //                last_parent_index = i;
+    //            }
+    //        if (tables->nodes.time[tables->edges.child[i]] < last_time_simplified)
+    //            {
+    //                parent_to_sort = tables->edges.parent[i];
+    //            }
+    //    }
+    //if (parent_to_sort != TSK_NULL)
+    //    {
+    //        bookmark.edges = last_parent_index;
+    //    }
+    //int rv = tsk_table_collection_sort(tables.get(), &bookmark, 0);
     int rv = tsk_table_collection_sort(tables.get(), nullptr, 0);
     handle_tskit_return_code(rv);
+    //if (bookmark.edges > 0)
+    //    {
+    //        std::rotate(tables->edges.left, tables->edges.left + bookmark.edges,
+    //                    tables->edges.left + tables->edges.num_rows);
+    //        std::rotate(tables->edges.right, tables->edges.right + bookmark.edges,
+    //                    tables->edges.right + tables->edges.num_rows);
+    //        std::rotate(tables->edges.parent, tables->edges.parent + bookmark.edges,
+    //                    tables->edges.parent + tables->edges.num_rows);
+    //        std::rotate(tables->edges.child, tables->edges.child + bookmark.edges,
+    //                    tables->edges.child + tables->edges.num_rows);
+    //    }
     rv = tsk_table_collection_simplify(tables.get(), samples.data(), samples.size(), 0,
                                        node_map.data());
     handle_tskit_return_code(rv);
@@ -521,6 +555,7 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
     std::vector<Birth> births;
     std::vector<tsk_id_t> samples, node_map;
     bool simplified = false;
+    double last_time_simplified = nsteps;
     for (unsigned step = 1; step <= nsteps; ++step)
         {
             deaths_and_parents(rng, parents, psurvival, births);
@@ -538,7 +573,8 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
 
                     if (buffer_new_edges == false)
                         {
-                            sort_n_simplify(samples, node_map, tables);
+                            sort_n_simplify(last_time_simplified, samples, node_map,
+                                            tables);
                         }
                     else
                         {
@@ -547,6 +583,7 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
                                                     edge_liftover, tables);
                         }
                     simplified = true;
+                    last_time_simplified = nsteps - step;
                     //remap parent nodes
                     for (auto& p : parents)
                         {
@@ -579,7 +616,7 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
             node_map.resize(tables->nodes.num_rows);
             if (buffer_new_edges == false)
                 {
-                    sort_n_simplify(samples, node_map, tables);
+                    sort_n_simplify(last_time_simplified, samples, node_map, tables);
                 }
             else
                 {
