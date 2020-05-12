@@ -6,8 +6,10 @@ Working out kinks in the idea... :)
 
 * tskit
 * attrs
+* seaborn
+* pandas
 
-Versions used here:
+Versions used here for the important things:
 
 * Python 3.8
 * tskit 2.3 (pip3 installed from PyPi)
