@@ -1,0 +1,13 @@
+simulator method N percent function
+fwpdy11 cppsort 1000 23.1 std::__introsort_loop
+tskit tsk_sort 1000 62.7 qsort_r
+tskit cppsort 1000 29.4 std::__introsort_loop
+fwpdy11 cppsort 5000 37.2 std::__introsort_loop
+tskit tsk_sort 5000 70.8 qsort_r
+tskit cppsort 5000 38.2 std::__introsort_loop
+fwpdy11 cppsort 10000 39.8 std::__introsort_loop
+tskit tsk_sort 10000 66.7 qsort_r
+tskit cppsort 10000 35.6 std::__introsort_loop
+fwpdy11 cppsort 25000 41.4 std::__introsort_loop
+tskit tsk_sort 25000 69.5 qsort_r
+tskit cppsort 25000 42.8 std::__introsort_loop
