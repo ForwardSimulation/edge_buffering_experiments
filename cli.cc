@@ -29,15 +29,17 @@ generate_main_options(command_line_options &o)
         "treefile", po::value<decltype(command_line_options::treefile)>(&o.treefile),
         "Ouput file name.  Default = treefile.trees");
     options.add_options()(
-        "buffer",
-        po::bool_switch(&o.buffer_new_edges),
+        "buffer", po::bool_switch(&o.buffer_new_edges),
         "If true, use edge buffering algorithm. If not, sort and simplify. Default = "
         "false");
+    options.add_options()("cppsort", po::bool_switch(&o.cppsort),
+                          "If true, sort edges in C++.  Not used with --buffer");
     options.add_options()(
-        "seed",
-        po::value<decltype(command_line_options::seed)>(&o.seed),
-        "Random number seed.  Default = 42.");
-
+        "parallel_sort", po::bool_switch(&o.parallel_sort),
+        "If true, and also using --cppsort, sort edges with parallel method");
+    options.add_options()("seed",
+                          po::value<decltype(command_line_options::seed)>(&o.seed),
+                          "Random number seed.  Default = 42.");
 
     return options;
 }

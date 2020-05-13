@@ -3,8 +3,9 @@
 #include "options.hpp"
 
 command_line_options::command_line_options()
-    : N{1000}, psurvival{0.}, nsteps{1000}, simplification_interval{100}, rho{0.},
-      treefile{"treefile.trees"}, buffer_new_edges{false}, seed{42}
+    : N{1000}, psurvival{0.}, nsteps{1000},
+      simplification_interval{100}, rho{0.}, treefile{"treefile.trees"},
+      buffer_new_edges{false}, cppsort{false}, parallel_sort{false}, seed{42}
 {
 }
 

@@ -10,7 +10,7 @@
 #include "rng.hpp"
 #include "tskit_tools.hpp"
 #include "edge_buffer.hpp"
-
+#include "sort_tables.hpp"
 
 namespace
 {
@@ -128,8 +128,9 @@ generate_births(const GSLrng& rng, const std::vector<Birth>& births, double birt
 
 // NOTE: seems like samples could/should be const?
 static void
-sort_n_simplify(double last_time_simplified, std::vector<tsk_id_t>& samples,
-                std::vector<tsk_id_t>& node_map, table_collection_ptr& tables)
+sort_n_simplify(bool cppsort, bool parallel_sort, double last_time_simplified,
+                std::vector<tsk_id_t>& samples, std::vector<tsk_id_t>& node_map,
+                table_collection_ptr& tables)
 {
     //tsk_bookmark_t bookmark;
     //std::memset(&bookmark, 0, sizeof(bookmark));
@@ -153,8 +154,14 @@ sort_n_simplify(double last_time_simplified, std::vector<tsk_id_t>& samples,
     //        bookmark.edges = last_parent_index;
     //    }
     //int rv = tsk_table_collection_sort(tables.get(), &bookmark, 0);
-    int rv = tsk_table_collection_sort(tables.get(), nullptr, 0);
+    int rv = -1;
+    if (cppsort == false) {
+    rv = tsk_table_collection_sort(tables.get(), nullptr, 0);
     handle_tskit_return_code(rv);
+    } else
+    {
+        sort_tables(tables.get(), parallel_sort);
+    }
     //if (bookmark.edges > 0)
     //    {
     //        std::rotate(tables->edges.left, tables->edges.left + bookmark.edges,
@@ -193,7 +200,7 @@ flush_buffer_n_simplify(std::vector<tsk_id_t>& alive_at_last_simplification,
 void
 simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
          unsigned simplification_interval, double rho, bool buffer_new_edges,
-         table_collection_ptr& tables)
+         bool cppsort, bool parallel_sort, table_collection_ptr& tables)
 {
     if (rho > 0.)
         {
@@ -242,8 +249,8 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
 
                     if (buffer_new_edges == false)
                         {
-                            sort_n_simplify(last_time_simplified, samples, node_map,
-                                            tables);
+                            sort_n_simplify(cppsort, parallel_sort, last_time_simplified,
+                                            samples, node_map, tables);
                         }
                     else
                         {
@@ -285,7 +292,8 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
             node_map.resize(tables->nodes.num_rows);
             if (buffer_new_edges == false)
                 {
-                    sort_n_simplify(last_time_simplified, samples, node_map, tables);
+                    sort_n_simplify(cppsort, parallel_sort, last_time_simplified,
+                                    samples, node_map, tables);
                 }
             else
                 {

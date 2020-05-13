@@ -35,7 +35,7 @@ main(int argc, char **argv)
     auto tables = make_table_collection_ptr(1.);
     simulate(rng, options.N, options.psurvival, options.nsteps,
              options.simplification_interval, options.rho, options.buffer_new_edges,
-             tables);
+             options.cppsort, options.parallel_sort, tables);
     auto ret = tsk_table_collection_build_index(tables.get(), 0);
     ret = tsk_table_collection_dump(tables.get(), options.treefile.c_str(), 0);
 }

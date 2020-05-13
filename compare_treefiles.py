@@ -39,7 +39,7 @@ print(
     f"Comparing node times: {np.array_equal(ts0.tables.nodes.time, ts1.tables.nodes.time)}"
 )
 
-# pd0 = pairwise_distance_branch(ts0, [i for i in ts0.samples()])
-# pd1 = pairwise_distance_branch(ts1, [i for i in ts1.samples()])
+pd0 = pairwise_distance_branch(ts0, [i for i in ts0.samples()])
+pd1 = pairwise_distance_branch(ts1, [i for i in ts1.samples()])
 #
-# print(f"Comparing pairwise distance matrix: {np.array_equal(pd0, pd1)}")
+print(f"Comparing pairwise distance matrix: {np.array_equal(pd0, pd1)}")

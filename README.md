@@ -17,10 +17,11 @@ Versions used here for the important things:
 
 # C++ dependencies
 
-* A C++ compiler.
+* A C++ compiler with complete C++17 support. For example, GCC >= 9.1
 * boost's program options library, ``sudo apt install libboost-program-options-dev``
 * GSL, `sudo apt install libgsl-dev`
 * cmake, `sudo apt install cmake`
+* tbb, `sudo apt install libtbb-dev`
 
 The tool chain used here is:
 
@@ -29,6 +30,7 @@ The tool chain used here is:
 * boost 1.71
 * gsl 2.5
 * cmake 3.16.3
+* tbb
 
 All packages are the OS versions.
 
