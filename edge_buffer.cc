@@ -221,6 +221,10 @@ copy_births_since_last_simplification(const edge_buffer_ptr& new_edges,
                             n = new_edges->births[n].next;
                         }
                 }
+            else if (*b != -1 and ptime >= max_time)
+                {
+                    break;
+                }
         }
 }
 
