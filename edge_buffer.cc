@@ -210,21 +210,11 @@ copy_births_since_last_simplification(const edge_buffer_ptr& new_edges,
             auto d = std::distance(new_edges->first.rbegin(), b);
             auto parent = new_edges->first.size() - d - 1;
             auto ptime = tables->nodes.time[parent];
-            if (new_edges->first[parent] != *b)
-                {
-                    throw std::runtime_error("houston, we have a problem");
-                }
-            if (*b != -1 && tables->nodes.time[parent] < max_time)
+            if (*b != -1 && ptime < max_time)
                 {
                     auto n = *b;
                     while (n != -1)
                         {
-                            auto ctime = tables->nodes.time[new_edges->births[n].child];
-                            if (ctime >= ptime)
-                                {
-                                    throw std::runtime_error(
-                                        "invalid times in buffered edges");
-                                }
                             edge_liftover.add_edge(new_edges->births[n].left,
                                                    new_edges->births[n].right, parent,
                                                    new_edges->births[n].child);
