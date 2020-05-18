@@ -112,6 +112,26 @@ recombine_and_record_edges(const GSLrng& rng, double littler,
                                      pnode0, child, nullptr, 0);
 }
 
+void
+recombine_and_buffer_edges(const GSLrng& rng, double littler,
+                           std::vector<double>& breakpoints, tsk_id_t parental_node0,
+                           tsk_id_t parental_node1, tsk_id_t child, double maxlen,
+                           edge_buffer_ptr& new_edges)
+{
+    recombination_breakpoints(rng, littler, maxlen, breakpoints);
+    double left = 0.;
+    std::size_t breakpoint = 1;
+    auto pnode0 = parental_node0;
+    auto pnode1 = parental_node1;
+    for (; breakpoint < breakpoints.size(); ++breakpoint)
+        {
+            buffer_new_edge(pnode0, left, breakpoints[breakpoint], child, new_edges);
+            std::swap(pnode0, pnode1);
+            left = breakpoints[breakpoint];
+        }
+    buffer_new_edge(pnode0, left, maxlen, child, new_edges);
+}
+
 static void
 generate_births(const GSLrng& rng, const std::vector<Birth>& births, double littler,
                 std::vector<double>& breakpoints, double birth_time,
@@ -149,16 +169,18 @@ generate_births(const GSLrng& rng, const std::vector<Birth>& births, double litt
                         {
                             throw std::runtime_error("bad parent/child time");
                         }
-                    buffer_new_edge(p0n0, 0., tables->sequence_length, new_node_0,
-                                    new_edges);
+                    recombine_and_buffer_edges(rng, littler, breakpoints,
+                            p0n0, p0n1, new_node_0, tables->sequence_length,
+                            new_edges);
                     ptime = tables->nodes.time[p1n0];
                     ctime = tables->nodes.time[new_node_1];
                     if (ctime >= ptime)
                         {
                             throw std::runtime_error("bad parent/child time");
                         }
-                    buffer_new_edge(p1n0, 0., tables->sequence_length, new_node_1,
-                                    new_edges);
+                    recombine_and_buffer_edges(rng, littler, breakpoints,
+                            p1n0, p1n1, new_node_1, tables->sequence_length,
+                            new_edges);
                 }
             parents[b.index] = Parent(b.index, new_node_0, new_node_1);
         }
