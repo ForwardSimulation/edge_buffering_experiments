@@ -86,6 +86,26 @@ recombination_breakpoints(const GSLrng& rng, double littler, double maxlen,
             breakpoints.push_back(gsl_ran_flat(rng.get(), 0., maxlen));
         }
     std::sort(begin(breakpoints), end(breakpoints));
+
+    // Remove all values that do not exist an odd number of times
+    auto itr = std::adjacent_find(begin(breakpoints), end(breakpoints));
+    if (itr != end(breakpoints))
+        {
+            std::vector<double> temp;
+            auto start = begin(breakpoints);
+            while (itr < end(breakpoints))
+                {
+                    auto not_equal
+                        = std::find_if(itr, breakpoints.end(),
+                                       [itr](const double d) { return d != *itr; });
+                    int even = (std::distance(itr, not_equal) % 2 == 0.0);
+                    temp.insert(temp.end(), start, itr + 1 - even);
+                    start = not_equal;
+                    itr = std::adjacent_find(start, std::end(breakpoints));
+                }
+            temp.insert(end(temp), start, breakpoints.end());
+            breakpoints.swap(temp);
+        }
 }
 
 void
@@ -169,18 +189,18 @@ generate_births(const GSLrng& rng, const std::vector<Birth>& births, double litt
                         {
                             throw std::runtime_error("bad parent/child time");
                         }
-                    recombine_and_buffer_edges(rng, littler, breakpoints,
-                            p0n0, p0n1, new_node_0, tables->sequence_length,
-                            new_edges);
+                    recombine_and_buffer_edges(rng, littler, breakpoints, p0n0, p0n1,
+                                               new_node_0, tables->sequence_length,
+                                               new_edges);
                     ptime = tables->nodes.time[p1n0];
                     ctime = tables->nodes.time[new_node_1];
                     if (ctime >= ptime)
                         {
                             throw std::runtime_error("bad parent/child time");
                         }
-                    recombine_and_buffer_edges(rng, littler, breakpoints,
-                            p1n0, p1n1, new_node_1, tables->sequence_length,
-                            new_edges);
+                    recombine_and_buffer_edges(rng, littler, breakpoints, p1n0, p1n1,
+                                               new_node_1, tables->sequence_length,
+                                               new_edges);
                 }
             parents[b.index] = Parent(b.index, new_node_0, new_node_1);
         }
