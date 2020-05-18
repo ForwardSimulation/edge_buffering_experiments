@@ -75,8 +75,46 @@ deaths_and_parents(const GSLrng& rng, const std::vector<Parent>& parents,
         }
 }
 
+void
+recombination_breakpoints(const GSLrng& rng, double littler, double maxlen,
+                          std::vector<double>& breakpoints)
+{
+    breakpoints.clear();
+    auto nxovers = gsl_ran_poisson(rng.get(), littler);
+    for (decltype(nxovers) i = 0; i < nxovers; ++i)
+        {
+            breakpoints.push_back(gsl_ran_flat(rng.get(), 0., maxlen));
+        }
+    std::sort(begin(breakpoints), end(breakpoints));
+}
+
+void
+recombine_and_record_edges(const GSLrng& rng, double littler,
+                           std::vector<double>& breakpoints, tsk_id_t parental_node0,
+                           tsk_id_t parental_node1, tsk_id_t child,
+                           table_collection_ptr& tables)
+// NOTE: this is an improvement on what I do in fwdpp?
+{
+    recombination_breakpoints(rng, littler, tables->sequence_length, breakpoints);
+    double left = 0.;
+    std::size_t breakpoint = 1;
+    auto pnode0 = parental_node0;
+    auto pnode1 = parental_node1;
+    for (; breakpoint < breakpoints.size(); ++breakpoint)
+        {
+            auto rv
+                = tsk_edge_table_add_row(&tables->edges, left, breakpoints[breakpoint],
+                                         pnode0, child, nullptr, 0);
+            std::swap(pnode0, pnode1);
+            left = breakpoints[breakpoint];
+        }
+    auto rv = tsk_edge_table_add_row(&tables->edges, left, tables->sequence_length,
+                                     pnode0, child, nullptr, 0);
+}
+
 static void
-generate_births(const GSLrng& rng, const std::vector<Birth>& births, double birth_time,
+generate_births(const GSLrng& rng, const std::vector<Birth>& births, double littler,
+                std::vector<double>& breakpoints, double birth_time,
                 bool buffer_new_edges, edge_buffer_ptr& new_edges,
                 std::vector<Parent>& parents, table_collection_ptr& tables)
 {
@@ -84,43 +122,43 @@ generate_births(const GSLrng& rng, const std::vector<Birth>& births, double birt
         {
             auto new_node_0 = record_node(birth_time, tables);
             auto new_node_1 = record_node(birth_time, tables);
-            auto parental_node0 = b.p0node0;
+            auto p0n0 = b.p0node0;
+            auto p0n1 = b.p0node1;
             if (gsl_rng_uniform(rng.get()) < 0.5)
                 {
-                    parental_node0 = b.p0node1;
+                    std::swap(p0n0, p0n1);
                 }
-            auto parental_node1 = b.p1node0;
+            auto p1n0 = b.p1node0;
+            auto p1n1 = b.p1node1;
             if (gsl_rng_uniform(rng.get()) < 0.5)
                 {
-                    parental_node1 = b.p1node1;
+                    std::swap(p1n0, p1n1);
                 }
             if (buffer_new_edges == false)
                 {
-                    auto rv = tsk_edge_table_add_row(
-                        &tables->edges, 0., tables->sequence_length, parental_node0,
-                        new_node_0, nullptr, 0);
-                    rv = tsk_edge_table_add_row(&tables->edges, 0.,
-                                                tables->sequence_length, parental_node1,
-                                                new_node_1, nullptr, 0);
+                    recombine_and_record_edges(rng, littler, breakpoints, p0n0, p0n1,
+                                               new_node_0, tables);
+                    recombine_and_record_edges(rng, littler, breakpoints, p1n0, p1n1,
+                                               new_node_1, tables);
                 }
             else
                 {
-                    double ptime = tables->nodes.time[parental_node0];
+                    double ptime = tables->nodes.time[p0n0];
                     double ctime = tables->nodes.time[new_node_0];
                     if (ctime >= ptime)
                         {
                             throw std::runtime_error("bad parent/child time");
                         }
-                    buffer_new_edge(parental_node0, 0., tables->sequence_length,
-                                    new_node_0, new_edges);
-                    ptime = tables->nodes.time[parental_node1];
+                    buffer_new_edge(p0n0, 0., tables->sequence_length, new_node_0,
+                                    new_edges);
+                    ptime = tables->nodes.time[p1n0];
                     ctime = tables->nodes.time[new_node_1];
                     if (ctime >= ptime)
                         {
                             throw std::runtime_error("bad parent/child time");
                         }
-                    buffer_new_edge(parental_node1, 0., tables->sequence_length,
-                                    new_node_1, new_edges);
+                    buffer_new_edge(p1n0, 0., tables->sequence_length, new_node_1,
+                                    new_edges);
                 }
             parents[b.index] = Parent(b.index, new_node_0, new_node_1);
         }
@@ -155,13 +193,15 @@ sort_n_simplify(bool cppsort, bool parallel_sort, double last_time_simplified,
     //    }
     //int rv = tsk_table_collection_sort(tables.get(), &bookmark, 0);
     int rv = -1;
-    if (cppsort == false) {
-    rv = tsk_table_collection_sort(tables.get(), nullptr, 0);
-    handle_tskit_return_code(rv);
-    } else
-    {
-        sort_tables(tables.get(), parallel_sort);
-    }
+    if (cppsort == false)
+        {
+            rv = tsk_table_collection_sort(tables.get(), nullptr, 0);
+            handle_tskit_return_code(rv);
+        }
+    else
+        {
+            sort_tables(tables.get(), parallel_sort);
+        }
     //if (bookmark.edges > 0)
     //    {
     //        std::rotate(tables->edges.left, tables->edges.left + bookmark.edges,
@@ -202,10 +242,6 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
          unsigned simplification_interval, double rho, bool buffer_new_edges,
          bool cppsort, bool parallel_sort, table_collection_ptr& tables)
 {
-    if (rho > 0.)
-        {
-            throw std::invalid_argument("recombination not implemented yet");
-        }
     std::vector<Parent> parents;
     for (unsigned i = 0; i < N; ++i)
         {
@@ -232,11 +268,13 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
     std::vector<tsk_id_t> samples, node_map;
     bool simplified = false;
     double last_time_simplified = nsteps;
+    double littler = rho / (2. * static_cast<double>(N));
+    std::vector<double> breakpoints;
     for (unsigned step = 1; step <= nsteps; ++step)
         {
             deaths_and_parents(rng, parents, psurvival, births);
-            generate_births(rng, births, nsteps - step, buffer_new_edges, new_edges,
-                            parents, tables);
+            generate_births(rng, births, littler, breakpoints, nsteps - step,
+                            buffer_new_edges, new_edges, parents, tables);
             if (step % simplification_interval == 0.)
                 {
                     samples.clear();
