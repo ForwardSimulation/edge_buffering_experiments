@@ -82,6 +82,8 @@ std::vector<ExistingEdges>
 find_pre_existing_edges(const table_collection_ptr& tables,
                         const std::vector<tsk_id_t>& alive_at_last_simplification,
                         const edge_buffer_ptr& new_edges)
+// FIXME: the indexing step need go no farther than the time of the most
+// recent node in alive_at_last_simplification.
 {
     std::vector<tsk_id_t> alive_with_new_edges;
     for (auto a : alive_at_last_simplification)
@@ -103,11 +105,13 @@ find_pre_existing_edges(const table_collection_ptr& tables,
             if (starts[tables->edges.parent[i]] == UMAX)
                 {
                     starts[tables->edges.parent[i]] = i;
-                    stops[tables->edges.parent[i]] = i;
+                    stops[tables->edges.parent[i]]
+                        = i; // FIXME: idiomatically, this should be i+1
                 }
             else
                 {
-                    stops[tables->edges.parent[i]] = i;
+                    stops[tables->edges.parent[i]]
+                        = i; // FIXME: idiomatically, this should be i+1
                 }
         }
 
@@ -171,6 +175,7 @@ handle_pre_existing_edges(const table_collection_ptr& tables,
                                                    tables->edges.child[offset]);
                             ++offset;
                         }
+                    // FIXME: stop condition isn't idiomatic
                     for (decltype(ex.start) i = ex.start; i < ex.stop + 1; ++i)
                         {
                             edge_liftover.add_edge(
