@@ -77,8 +77,15 @@ struct temp_edges
     }
 };
 
-void buffer_new_edge(tsk_id_t parent, double left, double right, double child,
+std::int32_t
+get_buffer_end(const edge_buffer_ptr& new_edges, std::size_t i);
+
+void buffer_new_edge(tsk_id_t parent, double left, double right, tsk_id_t child,
                      edge_buffer_ptr& new_edges);
+
+std::size_t
+buffer_new_edge_at(std::size_t loc, double left, double right, tsk_id_t child,
+                   edge_buffer_ptr& new_edges);
 
 void stitch_together_edges(const std::vector<tsk_id_t>& alive_at_last_simplification,
                            double max_time, edge_buffer_ptr& new_edges,

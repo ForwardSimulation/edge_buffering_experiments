@@ -22,6 +22,7 @@ treefile1 = sys.argv[2]
 
 ts0 = tskit.load(treefile0)
 ts1 = tskit.load(treefile1)
+print(ts0.num_trees, ts1.num_trees)
 
 # for i,j in zip([treefile0, treefile1], [ts0, ts1]):
 #     fn = i.replace("trees","svg")

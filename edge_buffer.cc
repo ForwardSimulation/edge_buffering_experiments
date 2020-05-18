@@ -46,7 +46,7 @@ get_buffer_end(const edge_buffer_ptr& new_edges, std::size_t i)
 }
 
 void
-buffer_new_edge(tsk_id_t parent, double left, double right, double child,
+buffer_new_edge(tsk_id_t parent, double left, double right, tsk_id_t child,
                 edge_buffer_ptr& new_edges)
 {
     if (parent == TSK_NULL || child == TSK_NULL)
