@@ -45,7 +45,7 @@ get_buffer_end(const edge_buffer_ptr& new_edges, std::size_t i)
     return f;
 }
 
-void
+std::int32_t
 buffer_new_edge(tsk_id_t parent, double left, double right, tsk_id_t child,
                 edge_buffer_ptr& new_edges)
 {
@@ -76,6 +76,17 @@ buffer_new_edge(tsk_id_t parent, double left, double right, tsk_id_t child,
             auto l = get_buffer_end(new_edges, parent);
             new_edges->births[l].next = new_edges->births.size() - 1;
         }
+    return new_edges->births.size() - 1;
+}
+
+std::int32_t
+buffer_new_edge_at(std::int32_t loc, double left, double right, tsk_id_t child,
+               edge_buffer_ptr& new_edges)
+{
+    if(loc>= new_edges->births.size()) { throw std::runtime_error("bad location"); }
+    new_edges->births.emplace_back(left, right, child);
+    new_edges->births[loc].next = new_edges->births.size() - 1;
+    return new_edges->births.size() - 1;
 }
 
 std::vector<ExistingEdges>
