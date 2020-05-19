@@ -143,9 +143,15 @@ recombine_and_buffer_edges(const GSLrng& rng, double littler,
     std::size_t breakpoint = 1;
     auto pnode0 = parental_node0;
     auto pnode1 = parental_node1;
-    std::int32_t end=-1, other_end=-1;
-    if(pnode0 < new_edges->first.size()) { end = get_buffer_end(new_edges, pnode0); }
-    if(pnode1 < new_edges->first.size()) { other_end = get_buffer_end(new_edges, pnode1); }
+    EDGE_BUFFER_INDEX_TYPE end = -1, other_end = -1;
+    if (pnode0 < new_edges->first.size())
+        {
+            end = get_buffer_end(new_edges, pnode0);
+        }
+    if (pnode1 < new_edges->first.size())
+        {
+            other_end = get_buffer_end(new_edges, pnode1);
+        }
 
     for (; breakpoint < breakpoints.size(); ++breakpoint)
         {
@@ -165,13 +171,11 @@ recombine_and_buffer_edges(const GSLrng& rng, double littler,
         }
     if (end == -1)
         {
-            end = buffer_new_edge(pnode0, left, maxlen, child,
-                                  new_edges);
+            end = buffer_new_edge(pnode0, left, maxlen, child, new_edges);
         }
     else
         {
-            end = buffer_new_edge_at(end, left, maxlen, child,
-                                     new_edges);
+            end = buffer_new_edge_at(end, left, maxlen, child, new_edges);
         }
 
     //buffer_new_edge(pnode0, left, maxlen, child, new_edges);

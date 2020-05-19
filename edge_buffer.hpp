@@ -6,17 +6,19 @@
 #include <tskit.h>
 #include "tskit_tools.hpp"
 
+using EDGE_BUFFER_INDEX_TYPE = std::int32_t;
+
 struct BirthData
 {
     double left, right;
     tsk_id_t child;
-    std::int32_t next;
+    EDGE_BUFFER_INDEX_TYPE next;
     BirthData(double l, double r, tsk_id_t c);
 };
 
 struct EdgeBuffer
 {
-    std::vector<std::int32_t> first;
+    std::vector<EDGE_BUFFER_INDEX_TYPE> first;
     std::vector<BirthData> births;
 
     EdgeBuffer(std::size_t num_nodes);
@@ -77,13 +79,14 @@ struct temp_edges
     }
 };
 
-std::int32_t get_buffer_end(const edge_buffer_ptr& new_edges, std::size_t i);
+EDGE_BUFFER_INDEX_TYPE get_buffer_end(const edge_buffer_ptr& new_edges, std::size_t i);
 
-std::int32_t buffer_new_edge(tsk_id_t parent, double left, double right, tsk_id_t child,
-                             edge_buffer_ptr& new_edges);
+EDGE_BUFFER_INDEX_TYPE buffer_new_edge(tsk_id_t parent, double left, double right,
+                                       tsk_id_t child, edge_buffer_ptr& new_edges);
 
-std::int32_t buffer_new_edge_at(std::int32_t loc, double left, double right,
-                                tsk_id_t child, edge_buffer_ptr& new_edges);
+EDGE_BUFFER_INDEX_TYPE buffer_new_edge_at(EDGE_BUFFER_INDEX_TYPE loc, double left,
+                                          double right, tsk_id_t child,
+                                          edge_buffer_ptr& new_edges);
 
 void stitch_together_edges(const std::vector<tsk_id_t>& alive_at_last_simplification,
                            double max_time, edge_buffer_ptr& new_edges,
