@@ -1,0 +1,149 @@
+---
+title: "Let's make (the tskit part of) forward simulations faster!"
+author: Kevin Thornton 
+institute: Ecology and Evolutionary Biology, UC Irvine
+output: 
+        beamer_presentation:
+            latex_engine: xelatex
+theme: metropolis
+#classoption : "aspectratio=169"
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(rmarkdown)
+library(reticulate)
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Tree sequence recording
+
+```{r,echo=F,fig.align="center",out.width="3.0in",out.height="2.0in"}
+include_graphics("recording.png")
+```
+
+## Lots of lineages fail to reproduce
+
+
+```{r,echo=F,fig.align="center",out.width="3.0in",out.height="2.0in", fig.cap="A few generations of a Wright-Fisher simulation."}
+include_graphics("messy.png")
+```
+
+## We can clean this up in linear time
+
+```{r,echo=F,fig.align="center",out.width="3.0in",out.height="2.0in", fig.cap="Simplification returns a minimal history + a mapping from input to output nodes. The details are in Kelleher, et al. 2018. PLoS Computational Biology."}
+include_graphics("simplified.png")
+```
+
+## Simplification requires that nodes be sorted
+
+* By parental birth time
+* Within a parent, by ``(left, child)``
+
+In ``Python``, we'd be comparing ``(parent time, parent, left, child)`` tuples.
+
+## The procedure
+
+* Record births = make new nodes and edges.
+* Every now and again, sort and simplify the tables.
+* Repeat until done.
+
+## Simulators and sorting methods
+
+### Simulators 
+
+* ``fwdpy11`` is written by me.  Uses an independent implementation of a table collection.  Sorting is in C++.
+* ``tskit`` means a simple simulator I wrote using ``tskit``.  It has command line options to sort tables in a bunch of ways.
+* ``slim`` means ``slim/master`` cloned on 12 May, 2020. ``slim`` uses ``tskit`` for all the tree sequence bits.
+
+### Sorting methods
+
+* ``tskit`` means using ``tsk_table_collection_sort``, which relies on ``C``'s ``qsort``.
+* ``cppsort`` means using ``C++``'s ``std::sort``.
+* ``cppsort_par`` means using ``C++17``'s parallel sort. This requires ``GCC9.1`` or later and is implemented using Intel's ``TBB`` library.
+
+## Simulation details
+
+Run for ``5N`` generations.  Simplify every 100 generations.  Write a ``tskit`` "tree file" at the end.
+
+\tiny
+```
+{
+    sh, code = readLines("../benchmarking/slimulate.sh"), eval = F, echo = T
+}
+```
+\normalsize
+
+    ##Simulation details
+
+\tiny
+```
+{
+    python, code = readLines("../benchmarking/run_fwdpy11.py"), eval = F, echo = T
+}
+```
+\normalsize
+
+## The sorting is expensive
+
+```{r,echo=F,fig.align="center",out.width="3.5in",out.height="2.0in", fig.cap="Percent of run time spent sorting. I'm comparing fwdpy11, which sorts tables using C++ to a simple simulator written using tskit. Sort algorithms have NlogN complexity. In C++11 and later, that is a worst-case bound."}
+include_graphics("../benchmarking/neutrality_time_sorting.png")
+```
+
+## The sorting is expensive
+```{r,echo=F,fig.align="center",out.width="3.5in",out.height="2.0in", fig.cap="Same data as previous, but showing the actual run times."}
+include_graphics("../benchmarking/neutrality_benchmark_simpler.png")
+```
+
+## Let's open the black box
+```{r,echo=F,fig.align="center",out.width="3.5in",out.height="2.0in", fig.cap="Call graph for tskit using tskit sorting. N = 10,000.  Generated via Google's ``perftools``."} 
+
+include_graphics("../benchmarking/tskit_tsk_sort_neutrality_10000.png")
+```
+
+## The problem
+
+* Sorting is expensive
+* Sorting is faster in C++ than in C. This is mostly due to inlining the comparison function.
+
+## Solutions that still involve sorting
+
+* Jerome is already working on a ``PR`` that allows you to pass in your own sorting function.
+* This will let ``slim`` use the ``C++`` sort and experiment with parallel sorting.
+* However, we don't need to sort at all!
+
+## Edge "buffering"
+
+* Forward simulators already generate edges in (close to) sorted order.
+* Births happen past to present.  Sorting just reverses that.
+* The simulator already needs to have breakpoints ordered so that it can work properly.
+* Going backwards through this buffer will yield our edges in the proper sorted order in *linear* time.
+
+## An edge buffer
+
+\small
+We track ``(left, right, child)`` data for each parent via a linked list.  The list is empty (``head[parent] == -1``)
+if no offspring, else it is the index of the first birth.  Births contain the index of the next birth from 
+the same parent. All the linked lists are shoved into a single contiguous vector.
+
+Adding ``tail`` tracking didn't make a compelling performance improvement.
+
+\tiny
+```{cpp, eval=F, echo=T}
+struct BirthData
+{
+    double left, right;
+    tsk_id_t child;
+    std::int64_t next; // -1 = NULL/tail
+};
+
+struct EdgeBuffer
+{
+    // len(node table), -1/NULL if
+    // a parent node has no offspring nodes
+    std::vector<std::int64_t> head;
+    // A vector of many linked lists
+    std::vector<BirthData> births;
+};
+```
+\normalsize
