@@ -7,6 +7,7 @@
 #include "tskit_tools.hpp"
 
 using EDGE_BUFFER_INDEX_TYPE = std::int32_t;
+static const EDGE_BUFFER_INDEX_TYPE NULL_EDGE_BUFFER_INDEX = -1;
 
 struct BirthData
 {

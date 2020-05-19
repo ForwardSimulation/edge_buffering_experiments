@@ -143,7 +143,8 @@ recombine_and_buffer_edges(const GSLrng& rng, double littler,
     std::size_t breakpoint = 1;
     auto pnode0 = parental_node0;
     auto pnode1 = parental_node1;
-    EDGE_BUFFER_INDEX_TYPE end = -1, other_end = -1;
+    EDGE_BUFFER_INDEX_TYPE end = NULL_EDGE_BUFFER_INDEX,
+                           other_end = NULL_EDGE_BUFFER_INDEX;
     if (pnode0 < new_edges->first.size())
         {
             end = get_buffer_end(new_edges, pnode0);

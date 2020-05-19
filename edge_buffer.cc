@@ -9,7 +9,7 @@
 static const auto UMAX = std::numeric_limits<std::size_t>::max();
 
 BirthData::BirthData(double l, double r, tsk_id_t c)
-    : left{l}, right{r}, child{c}, next{-1}
+    : left{l}, right{r}, child{c}, next{NULL_EDGE_BUFFER_INDEX}
 {
     if (r <= l)
         {
@@ -17,7 +17,7 @@ BirthData::BirthData(double l, double r, tsk_id_t c)
         }
 }
 
-EdgeBuffer::EdgeBuffer(std::size_t num_nodes) : first(num_nodes, -1), births{}
+EdgeBuffer::EdgeBuffer(std::size_t num_nodes) : first(num_nodes, NULL_EDGE_BUFFER_INDEX), births{}
 {
 }
 
@@ -34,10 +34,10 @@ get_buffer_end(const edge_buffer_ptr& new_edges, std::size_t i)
             throw std::runtime_error("invalid parent index");
         }
     auto f = new_edges->first[i];
-    while (f != -1 && new_edges->births[f].next != -1)
+    while (f != NULL_EDGE_BUFFER_INDEX && new_edges->births[f].next != NULL_EDGE_BUFFER_INDEX)
         {
             f = new_edges->births[f].next;
-            if (f != -1 && f >= new_edges->births.size())
+            if (f != NULL_EDGE_BUFFER_INDEX && f >= new_edges->births.size())
                 {
                     throw std::runtime_error("invalid next value");
                 }
@@ -55,13 +55,13 @@ buffer_new_edge(tsk_id_t parent, double left, double right, tsk_id_t child,
         }
     if (parent >= new_edges->first.size())
         {
-            new_edges->first.resize(parent + 1, -1);
+            new_edges->first.resize(parent + 1, NULL_EDGE_BUFFER_INDEX);
         }
     new_edges->births.emplace_back(left, right, child);
-    if (new_edges->first[parent] == -1)
+    if (new_edges->first[parent] == NULL_EDGE_BUFFER_INDEX)
         {
             new_edges->first[parent] = new_edges->births.size() - 1;
-            if (new_edges->births[new_edges->first[parent]].next != -1)
+            if (new_edges->births[new_edges->first[parent]].next != NULL_EDGE_BUFFER_INDEX)
                 {
                     std::ostringstream o;
                     o << "invalid next entry for first birth: " << parent << ' '
@@ -99,7 +99,7 @@ find_pre_existing_edges(const table_collection_ptr& tables,
     std::vector<tsk_id_t> alive_with_new_edges;
     for (auto a : alive_at_last_simplification)
         {
-            if (new_edges->first[a] != -1)
+            if (new_edges->first[a] != NULL_EDGE_BUFFER_INDEX)
                 {
                     alive_with_new_edges.push_back(a);
                 }
@@ -197,7 +197,7 @@ handle_pre_existing_edges(const table_collection_ptr& tables,
                     offset = ex.stop + 1;
                 }
             auto n = new_edges->first[ex.parent];
-            while (n != -1)
+            while (n != NULL_EDGE_BUFFER_INDEX)
                 {
                     edge_liftover.add_edge(new_edges->births[n].left,
                                            new_edges->births[n].right, ex.parent,
@@ -226,10 +226,10 @@ copy_births_since_last_simplification(const edge_buffer_ptr& new_edges,
             auto d = std::distance(new_edges->first.rbegin(), b);
             auto parent = new_edges->first.size() - d - 1;
             auto ptime = tables->nodes.time[parent];
-            if (*b != -1 && ptime < max_time)
+            if (*b != NULL_EDGE_BUFFER_INDEX && ptime < max_time)
                 {
                     auto n = *b;
-                    while (n != -1)
+                    while (n != NULL_EDGE_BUFFER_INDEX)
                         {
                             edge_liftover.add_edge(new_edges->births[n].left,
                                                    new_edges->births[n].right, parent,
@@ -237,7 +237,7 @@ copy_births_since_last_simplification(const edge_buffer_ptr& new_edges,
                             n = new_edges->births[n].next;
                         }
                 }
-            else if (*b != -1 and ptime >= max_time)
+            else if (*b != NULL_EDGE_BUFFER_INDEX and ptime >= max_time)
                 {
                     break;
                 }
@@ -268,6 +268,6 @@ stitch_together_edges(const std::vector<tsk_id_t>& alive_at_last_simplification,
     edge_liftover.clear();
     // TODO: move this cleanup to function
     new_edges->first.resize(tables->nodes.num_rows);
-    std::fill(begin(new_edges->first), end(new_edges->first), -1);
+    std::fill(begin(new_edges->first), end(new_edges->first), NULL_EDGE_BUFFER_INDEX);
     new_edges->births.clear();
 }
