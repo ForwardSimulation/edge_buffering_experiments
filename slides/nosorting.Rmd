@@ -147,3 +147,75 @@ struct EdgeBuffer
 };
 ```
 \normalsize
+
+## Example
+
+```{r,echo=F,fig.align="center",out.width="2.0in",out.height="1.0in"}
+include_graphics("recording.png")
+```
+```{r,echo=F,fig.align="center",out.width="4.0in",out.height="1.0in"}
+include_graphics("birthdataexample.png")
+```
+
+## Liftover to the edge table
+
+This is trivial for non-overlapping generations:
+
+* Go backwards through ``head``
+* Traverse each list and add rows to a new edge table.
+* Add rows from the existing edge table.
+
+Let's discuss testing and performance before overlapping generations, since that case is just a bit
+tedious.
+
+## Testing
+
+* Write a tree file with sorting and buffering using the same seed.
+* To test that topologies are the same, compare the distance matrix (branch stat) with respect to samples.
+* Cannot compare topologies directly because the buffering method relies on relaxed sorting criteria.
+  (Parents are not sorted lexically within birth time.  This is fine.)
+* Can only compare for ``N = 1,000`` (2,000 nodes) because the tree sequence stat machinery
+  takes over 30GB for this case.
+
+## Benchmarking
+
+* 6 core (12 thread) Intel Xeon W.
+* Measure total run time and peak RAM use.
+* One replicate per parameter combination.
+* Get same results on a Xeon E, but this machine takes 50% longer.
+* It'd be great to try my EPYC nodes for the parallel sorting, but that is our HPC and
+  I can't get gcc 9 there.  To do that right, I'd have to refactor and use ``tbb::parallel_sort``
+  directly.
+
+## The case of no recombination
+
+```{r,echo=F,fig.align="center",out.width="3.0in",out.height="3.0in",fig.cap="Performance."}
+include_graphics("../benchmarking/neutrality_benchmark.png")
+```
+
+## With recombination
+
+```{r,echo=F,fig.align="center",out.width="4.0in",out.height="2.0in",fig.cap="Performance with recombination. Only running the ``tskit`` sim here."}
+include_graphics("../benchmarking/neutrality_benchmark_rec.png")
+```
+
+## Some comments
+
+* Parallel sorts have good performance, but are very resource intensive. It's about 25% efficient,
+  which is typical.
+* The buffering does nearly as well with one thread as the parallel sort with no recombination and as
+  well or better with high recombination rates.
+* We are **not** taking full advantage of the buffering!!! The liftover from the buffer to the 
+  edge table prior to simplification is unnecessary.  (More on that in a bit.)
+
+## Handling overlapping generations
+
+Keep a list of nodes that were alive the last time we simplified. Call this list ``A``.  Then, next time we simplify:
+
+* For each node, record the first/last index where it is a parent in the edge table. (Linear)
+* For all entries ``a`` in ``A`` that left offspring, collect ``(a, first, last)`` into list ``L``. (Linear)
+* Sort ``L`` according to ``(birth time[a], first, a)``. (This is probably overly complex.)
+* As before, go backwards through new births, now stopping when we hit the last simplification time.
+* Co-iterate through the edge table and ``L`` to "stitch" together the remaining edges.
+
+This was the hard part. The design skips all of this automatically if nothing in ``A`` left offspring (non-overlapping generations).
