@@ -35,18 +35,13 @@ include_graphics("messy.png")
 include_graphics("simplified.png")
 ```
 
-## Simplification requires that nodes be sorted
-
-* By parental birth time
-* Within a parent, by ``(left, child)``
-
-In ``Python``, we'd be comparing ``(parent time, parent, left, child)`` tuples.
-
 ## The procedure
 
 * Record births = make new nodes and edges.
 * Every now and again, sort and simplify the tables.
 * Repeat until done.
+
+We are focussing on sorting today.
 
 ## Simulators and sorting methods
 
@@ -67,20 +62,14 @@ In ``Python``, we'd be comparing ``(parent time, parent, left, child)`` tuples.
 Run for ``5N`` generations.  Simplify every 100 generations.  Write a ``tskit`` "tree file" at the end.
 
 \tiny
-```
-{
-    sh, code = readLines("../benchmarking/slimulate.sh"), eval = F, echo = T
-}
+```{sh, code = readLines("../benchmarking/slimulate.sh"), eval = F, echo = T}
 ```
 \normalsize
 
-    ##Simulation details
+## Simulation details
 
 \tiny
-```
-{
-    python, code = readLines("../benchmarking/run_fwdpy11.py"), eval = F, echo = T
-}
+```{python, code = readLines("../benchmarking/run_fwdpy11.py"), eval = F, echo = T}
 ```
 \normalsize
 
@@ -212,10 +201,12 @@ include_graphics("../benchmarking/neutrality_benchmark_rec.png")
 
 Keep a list of nodes that were alive the last time we simplified. Call this list ``A``.  Then, next time we simplify:
 
-* For each node, record the first/last index where it is a parent in the edge table. (Linear)
+\small
+* For each node, record the first/last index where it is a parent in the edge table. (Linear, but should experiment w/binary search because there should only be sorted edges in there?)
 * For all entries ``a`` in ``A`` that left offspring, collect ``(a, first, last)`` into list ``L``. (Linear)
-* Sort ``L`` according to ``(birth time[a], first, a)``. (This is probably overly complex.)
-* As before, go backwards through new births, now stopping when we hit the last simplification time.
-* Co-iterate through the edge table and ``L`` to "stitch" together the remaining edges.
+* Sort ``L`` according to ``(birth time[a], first, a)``. (This is probably overly complex.) (Small NlogN)
+* As before, go backwards through new births, now stopping when we hit the last simplification time. (Linear)
+* Co-iterate through the edge table and ``L`` to "stitch" together the remaining edges. (Linear)
+\normalsize
 
-This was the hard part. The design skips all of this automatically if nothing in ``A`` left offspring (non-overlapping generations).
+This was the hard part.
