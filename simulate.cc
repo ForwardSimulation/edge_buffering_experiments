@@ -340,7 +340,7 @@ simulate(const GSLrng& rng, unsigned N, double psurvival, unsigned nsteps,
     std::vector<tsk_id_t> samples, node_map;
     bool simplified = false;
     double last_time_simplified = nsteps;
-    double littler = rho / (2. * static_cast<double>(N));
+    double littler = rho / (4. * static_cast<double>(N));
     std::vector<double> breakpoints;
     for (unsigned step = 1; step <= nsteps; ++step)
         {
