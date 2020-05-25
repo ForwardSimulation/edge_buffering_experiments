@@ -197,7 +197,7 @@ include_graphics("../benchmarking/neutrality_benchmark.png")
 
 ## With recombination
 
-```{r,echo=F,fig.align="center",out.width="4.0in",out.height="2.0in",fig.cap="Performance with recombination. The performance problem in fwdpp (left) has an obvious source (in the profile) and will be fixed by the time fwpdy11 0.8.0 is out."}
+```{r,echo=F,fig.align="center",out.width="4.0in",out.height="2.0in",fig.cap="Performance with recombination."}
 include_graphics("../benchmarking/neutrality_benchmark_rec.png")
 ```
 
