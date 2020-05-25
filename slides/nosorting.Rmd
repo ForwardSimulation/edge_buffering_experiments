@@ -154,8 +154,21 @@ This is trivial for non-overlapping generations:
 * Traverse each list and add rows to a new edge table.
 * Add rows from the existing edge table.
 
-Let's discuss testing and performance before overlapping generations, since that case is just a bit
-tedious.
+This isn't what we do, because it doesn't generalize to individuals of different ages.
+
+## Handling overlapping generations
+
+Keep a list of nodes that were alive the last time we simplified. Call this list ``A``.  Then, next time we simplify:
+
+\small
+* For each node, record the first/last index where it is a parent in the edge table. (Linear, but should experiment w/binary search because there should only be sorted edges in there?)
+* For all entries ``a`` in ``A`` that left offspring, collect ``(a, first, last)`` into list ``L``. (Linear)
+* Sort ``L`` according to ``(birth time[a], first, a)``.  (Small NlogN)
+* As before, go backwards through new births, now stopping when we hit the last simplification time. (Linear)
+* Co-iterate through the edge table and ``L`` to "stitch" together the remaining edges. (Linear)
+\normalsize
+
+This was the hard part.
 
 ## Testing
 
@@ -168,12 +181,12 @@ tedious.
 
 ## Benchmarking
 
-* 6 core (12 thread) Intel Xeon W.
+* 6 core (12 thread) Intel `Xeon W`.
 * Measure total run time and peak RAM use.
 * One replicate per parameter combination.
-* Get same results on a Xeon E, but this machine takes 50% longer.
-* It'd be great to try my EPYC nodes for the parallel sorting, but that is our HPC and
-  I can't get gcc 9 there.  To do that right, I'd have to refactor and use ``tbb::parallel_sort``
+* Get same results on a `Xeon E`, but the `E` machine takes 50% longer.
+* It'd be great to try my `EPYC` nodes for the parallel sorting, but that is our `HPC` and
+  I can't get `GCC9` there.  To do that right, I'd have to refactor and use ``tbb::parallel_sort``
   directly.
 
 ## The case of no recombination
@@ -184,7 +197,7 @@ include_graphics("../benchmarking/neutrality_benchmark.png")
 
 ## With recombination
 
-```{r,echo=F,fig.align="center",out.width="4.0in",out.height="2.0in",fig.cap="Performance with recombination. Only running the ``tskit`` sim here."}
+```{r,echo=F,fig.align="center",out.width="4.0in",out.height="2.0in",fig.cap="Performance with recombination. The performance problem in fwdpp (left) has an obvious source (in the profile) and will be fixed by the time fwpdy11 0.8.0 is out."}
 include_graphics("../benchmarking/neutrality_benchmark_rec.png")
 ```
 
@@ -192,21 +205,7 @@ include_graphics("../benchmarking/neutrality_benchmark_rec.png")
 
 * Parallel sorts have good performance, but are very resource intensive. It's about 25% efficient,
   which is typical.
-* The buffering does nearly as well with one thread as the parallel sort with no recombination and as
-  well or better with high recombination rates.
+* The buffering does nearly as well as the parallel sort with a single thread.
 * We are **not** taking full advantage of the buffering!!! The liftover from the buffer to the 
   edge table prior to simplification is unnecessary.  (More on that in a bit.)
 
-## Handling overlapping generations
-
-Keep a list of nodes that were alive the last time we simplified. Call this list ``A``.  Then, next time we simplify:
-
-\small
-* For each node, record the first/last index where it is a parent in the edge table. (Linear, but should experiment w/binary search because there should only be sorted edges in there?)
-* For all entries ``a`` in ``A`` that left offspring, collect ``(a, first, last)`` into list ``L``. (Linear)
-* Sort ``L`` according to ``(birth time[a], first, a)``. (This is probably overly complex.) (Small NlogN)
-* As before, go backwards through new births, now stopping when we hit the last simplification time. (Linear)
-* Co-iterate through the edge table and ``L`` to "stitch" together the remaining edges. (Linear)
-\normalsize
-
-This was the hard part.
