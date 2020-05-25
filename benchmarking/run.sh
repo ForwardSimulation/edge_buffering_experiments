@@ -13,6 +13,12 @@ do
     RESULTS=`cat temp.txt`
     echo slim tsk_sort" $N $RESULTS" >> neutrality_benchmark.txt
     STEPS=`echo "5*$N"|bc -l`
+    /usr/bin/time -f "%e %M" -o temp.txt ~/src/fwdpp/examples/edge_buffering --N $N  --nsteps $STEPS --seed $SEED --treefile fwdpp.trees
+    RESULTS=`cat temp.txt`
+    echo fwdpp cppsort "$N $RESULTS" >> neutrality_benchmark.txt
+    /usr/bin/time -f "%e %M" -o temp.txt ~/src/fwdpp/examples/edge_buffering --N $N  --nsteps $STEPS --seed $SEED --buffer --treefile fwdpp.trees
+    RESULTS=`cat temp.txt`
+    echo fwdpp buffer "$N $RESULTS" >> neutrality_benchmark.txt
     /usr/bin/time -f "%e %M" -o temp.txt ../build/wfbuffered --N $N --nsteps $STEPS --seed $SEED
     RESULTS=`cat temp.txt`
     echo tskit tsk_sort" $N $RESULTS" >> neutrality_benchmark.txt
@@ -31,3 +37,5 @@ rm -f slim.txt
 rm -f temp.txt
 rm -f slim.trees
 rm -f fwdpy11.trees
+rm -f treefile.trees
+rm -f fwdpp.trees

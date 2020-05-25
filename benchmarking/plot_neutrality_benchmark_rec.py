@@ -11,7 +11,15 @@ df["rho"] = np.log10(df["rho"])
 g = sns.FacetGrid(df, col="N", sharey=False)
 
 g = (
-    g.map(sns.scatterplot, "rho", "time", data=df, hue="method", alpha=0.8,)
+    g.map(
+        sns.scatterplot,
+        "rho",
+        "time",
+        data=df,
+        style="method",
+        hue="simulator",
+        alpha=0.8,
+    )
     .add_legend()
     .set_axis_labels(r"$log_{10}(4Nr)$", "Run time (minutes)")
 )
