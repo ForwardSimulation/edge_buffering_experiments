@@ -255,9 +255,7 @@ include_graphics("edge77.png")
 
 ## Plans
 
-* Clean up the `fwdpp` PR.  This could actually take a few weeks, depending on whether I try to write tests
-  that don't depend on simulations. In any case, there's a lot of integer cast warnings to sanitize,
-  and lots of `D.R.Y.` issues to turn into functions.
+* Merge the `fwdpp` PR.  I think it is ready, and I'll add testing scripts (the simulations + branch stats) and docs in subsequent PRs.
 * Update `fwdpy11`'s `fwdpp` submodule and replace sorting with buffering. This is the last "hard" thing for 0.8.0 (I think...).
 * Start working on a bunch of `tsk_edge_buffer_foo` stuff in `C`.
 
