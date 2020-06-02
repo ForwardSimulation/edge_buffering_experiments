@@ -195,6 +195,12 @@ This was the hard part.
 include_graphics("../benchmarking/neutrality_benchmark.png")
 ```
 
+## The case of no recombination
+
+```{r,echo=F,fig.align="center",out.width="3.0in",out.height="3.0in",fig.cap="Memory use from the previous slide."}
+include_graphics("../benchmarking/neutrality_benchmark_memory.png")
+
+
 ## With recombination
 
 ```{r,echo=F,fig.align="center",out.width="4.0in",out.height="2.0in",fig.cap="Performance with recombination."}
@@ -206,6 +212,23 @@ include_graphics("../benchmarking/neutrality_benchmark_rec.png")
 * Parallel sorts have good performance, but are very resource intensive. It's about 25% efficient,
   which is typical.
 * The buffering does nearly as well as the parallel sort with a single thread.
-* We are **not** taking full advantage of the buffering!!! The liftover from the buffer to the 
-  edge table prior to simplification is unnecessary.  (More on that in a bit.)
+* We are **not** taking full advantage of the buffering!!! 
+  * We are copying big blocks of memory around, which is why RAM use is high
 
+## A new simplification function
+
+```{r,echo=F,fig.align="center",out.width="4.0in",out.height="2.0in",fig.cap="Performance of a new simplification function that's aware of edge buffers."}
+include_graphics("../benchmarking/neutrality_benchmark_rec_new_simplification.png")
+```
+
+## A new simplification function
+
+```{r,echo=F,fig.align="center",out.width="4.0in",out.height="2.0in",fig.cap="Relative memory use. Same data as last slide."}
+include_graphics("../benchmarking/neutrality_benchmark_rec_new_simplification_memory.png")
+```
+
+## Plans
+
+* Clean up the `fwdpp` PR
+* Update `fwdpy11`'s `fwdpp` submodule and replace sorting with buffering. This is the last "hard" thing for 0.8.0 (I think...).
+* Start working on a bunch of `tsk_edge_buffer_foo` stuff in `C`.
