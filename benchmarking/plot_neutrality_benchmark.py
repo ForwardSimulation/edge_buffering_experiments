@@ -20,8 +20,6 @@ df["mem"] = df["mem"] / (1024 ** 2)
 
 f, (ax1, ax2) = plt.subplots(1, 2, sharex=False, sharey=False)
 
-df["time"] /= 60.0
-
 p = sns.scatterplot(
     "N",
     "time",

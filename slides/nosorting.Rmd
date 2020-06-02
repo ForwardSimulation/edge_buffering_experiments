@@ -6,7 +6,7 @@ output:
         beamer_presentation:
             latex_engine: xelatex
 theme: metropolis
-#classoption : "aspectratio=169"
+# classoption : "aspectratio=169"
 ---
 
 ```{r setup, include=FALSE}
@@ -37,25 +37,43 @@ include_graphics("simplified.png")
 
 ## The procedure
 
+### What we are doing:
+
 * Record births = make new nodes and edges.
-* Every now and again, sort and simplify the tables.
+* Every now and again, **sort and simplify** the tables.
 * Repeat until done.
 
-We are focussing on sorting today.
+### What we would rather be doing:
+
+* Record births = make new nodes and edges.
+* Every now and again, **simplify** the tables.
+* Repeat until done.
+
+### Our goal
+
+* Eliminate sorting!
 
 ## Simulators and sorting methods
 
 ### Simulators 
 
+\footnotesize
 * ``fwdpy11`` is written by me.  Uses an independent implementation of a table collection.  Sorting is in C++.
-* ``tskit`` means a simple simulator I wrote using ``tskit``.  It has command line options to sort tables in a bunch of ways.
 * ``slim`` means ``slim/master`` cloned on 12 May, 2020. ``slim`` uses ``tskit`` for all the tree sequence bits.
+* ``tskit`` means a simple simulator I wrote using ``tskit``.  It has command line options to sort tables in a bunch of ways.
+* ``fwdpp`` means a simple simulator I wrote using ``fwdpp``.  It has command line options to sort tables in a bunch of ways.
+  Sorting is in C++.
+
+(The `tskit` and `fwdpp` simulators give the same tree sequences/table collections for the same seed.)
+\normalsize
 
 ### Sorting methods
 
+\footnotesize
 * ``tskit`` means using ``tsk_table_collection_sort``, which relies on ``C``'s ``qsort``.
 * ``cppsort`` means using ``C++``'s ``std::sort``.
 * ``cppsort_par`` means using ``C++17``'s parallel sort. This requires ``GCC9.1`` or later and is implemented using Intel's ``TBB`` library.
+\normalsize
 
 ## Simulation details
 
@@ -105,7 +123,8 @@ include_graphics("../benchmarking/tskit_tsk_sort_neutrality_10000.png")
 
 * Forward simulators already generate edges in (close to) sorted order.
 * Births happen past to present.  Sorting just reverses that.
-* The simulator already needs to have breakpoints ordered so that it can work properly.
+* The simulator already needs to have breakpoints ordered so that it can work properly, so let's just
+  write down `(child, left, right)` as we go! (Yes, this sounds rather obvious.)
 * Going backwards through this buffer will yield our edges in the proper sorted order in *linear* time.
 
 ## An edge buffer
@@ -114,8 +133,6 @@ include_graphics("../benchmarking/tskit_tsk_sort_neutrality_10000.png")
 We track ``(left, right, child)`` data for each parent via a linked list.  The list is empty (``head[parent] == -1``)
 if no offspring, else it is the index of the first birth.  Births contain the index of the next birth from 
 the same parent. All the linked lists are shoved into a single contiguous vector.
-
-Adding ``tail`` tracking didn't make a compelling performance improvement.
 
 \tiny
 ```{cpp, eval=F, echo=T}
@@ -136,6 +153,8 @@ struct EdgeBuffer
 };
 ```
 \normalsize
+
+(The current implementation also tracks the lists' ``tail``s.)
 
 ## Example
 
@@ -227,6 +246,13 @@ include_graphics("../benchmarking/neutrality_benchmark_rec_new_simplification.pn
 include_graphics("../benchmarking/neutrality_benchmark_rec_new_simplification_memory.png")
 ```
 
+## Victory!
+
+```{r,echo=F,fig.align="center",out.width="3in", out.height="2.0in", fig.cap="N=10,000, 4Nr=100,000, 5N generations."} 
+include_graphics("edge77.png")
+```
+
+
 ## Plans
 
 * Clean up the `fwdpp` PR.  This could actually take a few weeks, depending on whether I try to write tests
@@ -234,3 +260,30 @@ include_graphics("../benchmarking/neutrality_benchmark_rec_new_simplification_me
   and lots of `D.R.Y.` issues to turn into functions.
 * Update `fwdpy11`'s `fwdpp` submodule and replace sorting with buffering. This is the last "hard" thing for 0.8.0 (I think...).
 * Start working on a bunch of `tsk_edge_buffer_foo` stuff in `C`.
+
+## tskit proposal
+
+\tiny
+```{c, eval=F, echo=T}
+typedef struct
+/* 4 byte packing problem,
+   but NBD b/c we'll be 
+   doing 64 bit tables soon.
+*/
+{
+    tsk_id_t child;
+    double left, right;
+    int64_t next;
+} tsk_birth_record_t;
+
+typedef struct
+{
+  tsk_id_t * head, * tail;
+  tsk_birth_record_t * buffer;
+  // Other stuff for size tracking
+} tsk_edge_buffer_t;
+
+int tsk_edge_buffer_init(tsk_edge_buffer_t * buffer, ...);
+// etc.
+```
+\normalsize
