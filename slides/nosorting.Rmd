@@ -6,7 +6,7 @@ output:
         beamer_presentation:
             latex_engine: xelatex
 theme: metropolis
-# classoption : "aspectratio=169"
+classoption : "aspectratio=169"
 ---
 
 ```{r setup, include=FALSE}
